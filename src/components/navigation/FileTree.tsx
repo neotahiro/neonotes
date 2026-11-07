@@ -1,4 +1,5 @@
 "use client";
+import { byCreated } from "@/lib/tree";
 import type { WorkspaceNode } from "@/lib/types";
 import { TreeRow, type TreeActions } from "./TreeRow";
 
@@ -11,11 +12,8 @@ interface FileTreeProps extends TreeActions {
   editingId: string | null;
 }
 
-const byKindThenName = (a: WorkspaceNode, b: WorkspaceNode) =>
-  a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === "folder" ? -1 : 1;
-
 export function FileTree({ nodes, parentId, depth = 0, ...rest }: FileTreeProps) {
-  const children = nodes.filter((n) => n.parentId === parentId).sort(byKindThenName);
+  const children = nodes.filter((n) => n.parentId === parentId).sort(byCreated);
 
   if (children.length === 0 && parentId !== null) {
     return (
