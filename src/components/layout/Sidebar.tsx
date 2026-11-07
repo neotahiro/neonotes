@@ -5,9 +5,10 @@ import type { Workspace } from "@/hooks/useWorkspace";
 import type { WorkspaceNode } from "@/lib/types";
 import { cn, stripHtml } from "@/lib/utils";
 import { FileTree } from "@/components/navigation/FileTree";
-import { TreeRow, type TreeActions } from "@/components/navigation/TreeRow";
+import { DRAG_TYPE, TreeRow, type TreeActions } from "@/components/navigation/TreeRow";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
+import { MoveDialog } from "@/components/ui/MoveDialog";
 import { ProfileMenu } from "./ProfileMenu";
 
 interface SidebarProps {
@@ -21,12 +22,16 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<WorkspaceNode | null>(null);
+  const [moving, setMoving] = useState<WorkspaceNode | null>(null);
+  const [targetId, setTargetId] = useState<string | null>(null); // folder that new items are created in
+  const [rootOver, setRootOver] = useState(false);
 
   // After loading, open the folders that contain the current document.
   useEffect(() => {
     if (!ws.ready) return;
     const ids: string[] = [];
     let cur = ws.nodes.find((n) => n.id === ws.activeId);
+    setTargetId(cur?.parentId ?? null);
     while (cur?.parentId) {
       const parentId: string = cur.parentId;
       ids.push(parentId);
@@ -36,19 +41,35 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ws.ready]);
 
+  const target = ws.nodes.find((n) => n.id === targetId && n.kind === "folder") ?? null;
   const expand = (id: string) => setExpanded((s) => new Set(s).add(id));
   const closeOnMobile = () => {
     if (window.matchMedia("(max-width: 767px)").matches) onClose();
   };
 
+  const createHere = (kind: "doc" | "folder") => {
+    if (target) expand(target.id);
+    setEditingId(ws.create(kind, target?.id ?? null));
+  };
+
+  const moveTo = (id: string, parentId: string | null) => {
+    if (ws.move(id, parentId) && parentId) expand(parentId);
+  };
+
   const actions: TreeActions = {
-    onSelect: (n) => { ws.select(n.id); closeOnMobile(); },
-    onToggle: (id) =>
+    onSelect: (n) => {
+      ws.select(n.id);
+      setTargetId(n.parentId);
+      closeOnMobile();
+    },
+    onToggle: (id) => {
+      setTargetId(id);
       setExpanded((s) => {
         const next = new Set(s);
         if (next.has(id)) next.delete(id); else next.add(id);
         return next;
-      }),
+      });
+    },
     onStartRename: setEditingId,
     onCommitRename: (id, name) => {
       if (name.trim()) ws.rename(id, name.trim());
@@ -59,8 +80,11 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
     onFavorite: ws.toggleFavorite,
     onAddDoc: (parentId) => {
       expand(parentId);
+      setTargetId(parentId);
       setEditingId(ws.create("doc", parentId));
     },
+    onMove: setMoving,
+    onDropOn: moveTo,
   };
 
   const q = query.trim().toLowerCase();
@@ -111,8 +135,16 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
         <div className="flex h-12 items-center justify-between px-3">
           <span className="font-serif text-lg font-semibold tracking-tight">Noenotes</span>
           <div className="flex items-center">
-            <IconButton icon={FilePlus} label="New document" onClick={() => setEditingId(ws.create("doc", null))} />
-            <IconButton icon={FolderPlus} label="New folder" onClick={() => setEditingId(ws.create("folder", null))} />
+            <IconButton
+              icon={FilePlus}
+              label={target ? `New document in ${target.name}` : "New document"}
+              onClick={() => createHere("doc")}
+            />
+            <IconButton
+              icon={FolderPlus}
+              label={target ? `New folder in ${target.name}` : "New folder"}
+              onClick={() => createHere("folder")}
+            />
           </div>
         </div>
 
@@ -147,7 +179,32 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
                 </section>
               )}
               <section>
-                <h2 className="px-2 py-1 text-xs font-medium text-muted">Documents</h2>
+                <h2 className="text-xs font-medium text-muted">
+                  <button
+                    type="button"
+                    title="Create new items at the top level, or drop a note here to move it out of its folder"
+                    onClick={() => setTargetId(null)}
+                    onDragOver={(e) => {
+                      if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+                      e.preventDefault();
+                      setRootOver(true);
+                    }}
+                    onDragLeave={() => setRootOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setRootOver(false);
+                      const id = e.dataTransfer.getData(DRAG_TYPE);
+                      if (id) moveTo(id, null);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-1.5 rounded px-2 py-1 text-left transition-colors hover:text-ink",
+                      rootOver && "bg-accent-soft ring-1 ring-accent",
+                    )}
+                  >
+                    Documents
+                    {target && <span className="min-w-0 truncate font-normal">· adding to {target.name}</span>}
+                  </button>
+                </h2>
                 <FileTree
                   {...actions}
                   nodes={ws.nodes}
@@ -180,6 +237,16 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
           setPendingDelete(null);
         }}
         onCancel={() => setPendingDelete(null)}
+      />
+
+      <MoveDialog
+        node={moving}
+        nodes={ws.nodes}
+        onMove={(parentId) => {
+          if (moving) moveTo(moving.id, parentId);
+          setMoving(null);
+        }}
+        onClose={() => setMoving(null)}
       />
     </>
   );
