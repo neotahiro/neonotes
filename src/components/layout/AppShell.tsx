@@ -16,6 +16,18 @@ export function AppShell() {
     if (window.matchMedia("(max-width: 767px)").matches) setSidebarOpen(false);
   }, []);
 
+  // Ctrl/⌘ + \ toggles the sidebar
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "\\") {
+        e.preventDefault();
+        setSidebarOpen((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const active = ws.nodes.find((n) => n.id === ws.activeId && n.kind === "doc") ?? null;
   const parent = active ? ws.nodes.find((n) => n.id === active.parentId) : null;
   const crumbs = active ? [...(parent ? [parent.name] : []), active.name || "Untitled"] : [];

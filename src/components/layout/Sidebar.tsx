@@ -6,6 +6,7 @@ import type { WorkspaceNode } from "@/lib/types";
 import { cn, stripHtml } from "@/lib/utils";
 import { FileTree } from "@/components/navigation/FileTree";
 import { TreeRow, type TreeActions } from "@/components/navigation/TreeRow";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
 import { ProfileMenu } from "./ProfileMenu";
 
@@ -19,6 +20,7 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["f1"]));
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<WorkspaceNode | null>(null);
 
   const expand = (id: string) => setExpanded((s) => new Set(s).add(id));
   const closeOnMobile = () => {
@@ -39,10 +41,7 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
       setEditingId(null);
     },
     onCancelRename: () => setEditingId(null),
-    onDelete: (n) => {
-      const what = n.kind === "folder" ? "this folder and everything in it" : `“${n.name || "Untitled"}”`;
-      if (window.confirm(`Delete ${what}?`)) ws.remove(n.id);
-    },
+    onDelete: setPendingDelete,
     onFavorite: ws.toggleFavorite,
     onAddDoc: (parentId) => {
       expand(parentId);
@@ -153,6 +152,21 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
 
         <ProfileMenu />
       </aside>
+
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        title={pendingDelete?.kind === "folder" ? "Delete this folder?" : "Delete this document?"}
+        message={
+          pendingDelete?.kind === "folder"
+            ? `“${pendingDelete.name || "Untitled"}” and everything inside it will be deleted.`
+            : `“${pendingDelete?.name || "Untitled"}” will be deleted.`
+        }
+        onConfirm={() => {
+          if (pendingDelete) ws.remove(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+        onCancel={() => setPendingDelete(null)}
+      />
     </>
   );
 }
