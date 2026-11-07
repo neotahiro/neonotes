@@ -1,18 +1,127 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { seedNodes } from "@/lib/mock-data";
+import { loadWorkspace, persist } from "@/lib/storage/localStore";
 import type { NodeKind, WorkspaceNode } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
+export type SaveStatus = "loading" | "saving" | "saved" | "error";
+
+const SAVE_DELAY_MS = 400;
+
 /**
- * In-memory workspace. The public shape of this hook is the contract the
- * Drive-backed implementation will keep, so UI components won't change.
+ * Workspace state, saved to this browser's IndexedDB.
+ * The public shape stays the same when Drive sync replaces the storage layer.
  */
 export function useWorkspace() {
-  const [nodes, setNodes] = useState<WorkspaceNode[]>(seedNodes);
-  const [activeId, setActiveId] = useState<string | null>(
-    seedNodes.find((n) => n.kind === "doc")?.id ?? null,
-  );
+  const [nodes, setNodes] = useState<WorkspaceNode[]>([]);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const [status, setStatus] = useState<SaveStatus>("loading");
+
+  // What is already written to storage, to work out what changed.
+  const persisted = useRef(new Map<string, WorkspaceNode>());
+  const persistedActive = useRef<string | null>(null);
+  const nodesRef = useRef(nodes);
+  const activeRef = useRef(activeId);
+  nodesRef.current = nodes;
+  activeRef.current = activeId;
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load once on startup.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = await loadWorkspace();
+        if (cancelled) return;
+        let list = stored.nodes;
+        let active = stored.activeId;
+        if (!stored.seeded) {
+          if (list.length === 0) {
+            list = seedNodes;
+            active = seedNodes[0].id;
+          }
+          await persist({ put: list, meta: { seeded: true, activeId: active } });
+        }
+        if (cancelled) return;
+        if (!list.some((n) => n.id === active && n.kind === "doc")) active = null;
+        persisted.current = new Map(list.map((n) => [n.id, n]));
+        persistedActive.current = active;
+        setNodes(list);
+        setActiveId(active);
+        setStatus("saved");
+      } catch {
+        if (cancelled) return;
+        // Storage unavailable (e.g. private browsing): keep working in memory.
+        setNodes(seedNodes);
+        setActiveId(seedNodes[0].id);
+        setStatus("error");
+      }
+      if (!cancelled) setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const hasChanges = useCallback(() => {
+    const prev = persisted.current;
+    const list = nodesRef.current;
+    return (
+      list.length !== prev.size ||
+      list.some((n) => prev.get(n.id) !== n) ||
+      activeRef.current !== persistedActive.current
+    );
+  }, []);
+
+  const flush = useCallback(async () => {
+    if (timer.current) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    if (!hasChanges()) {
+      setStatus((s) => (s === "error" ? s : "saved"));
+      return;
+    }
+    const prev = persisted.current;
+    const snapshot = nodesRef.current;
+    const active = activeRef.current;
+    const ids = new Set(snapshot.map((n) => n.id));
+    const put = snapshot.filter((n) => prev.get(n.id) !== n);
+    const remove = [...prev.keys()].filter((id) => !ids.has(id));
+    const activeChanged = active !== persistedActive.current;
+    try {
+      await persist({ put, remove, meta: activeChanged ? { activeId: active } : undefined });
+      put.forEach((n) => prev.set(n.id, n));
+      remove.forEach((id) => prev.delete(id));
+      persistedActive.current = active;
+      setStatus(hasChanges() ? "saving" : "saved");
+    } catch {
+      setStatus("error");
+    }
+  }, [hasChanges]);
+
+  // Save shortly after any change.
+  useEffect(() => {
+    if (!ready || !hasChanges()) return;
+    setStatus("saving");
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(flush, SAVE_DELAY_MS);
+  }, [nodes, activeId, ready, hasChanges, flush]);
+
+  // Save immediately when the tab is hidden or closed.
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void flush();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", () => void flush());
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, [flush]);
 
   const create = useCallback((kind: NodeKind, parentId: string | null = null) => {
     const node: WorkspaceNode = {
@@ -35,21 +144,26 @@ export function useWorkspace() {
   }, []);
 
   const remove = useCallback((id: string) => {
-    setNodes((prev) => {
-      const doomed = new Set([id]);
-      let grew = true;
-      while (grew) {
-        grew = false;
-        for (const n of prev) {
-          if (n.parentId && doomed.has(n.parentId) && !doomed.has(n.id)) { doomed.add(n.id); grew = true; }
+    const list = nodesRef.current;
+    const doomed = new Set([id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const n of list) {
+        if (n.parentId && doomed.has(n.parentId) && !doomed.has(n.id)) {
+          doomed.add(n.id);
+          grew = true;
         }
       }
-      setActiveId((cur) => (cur && doomed.has(cur) ? null : cur));
-      return prev.filter((n) => !doomed.has(n.id));
-    });
+    }
+    setNodes(list.filter((n) => !doomed.has(n.id)));
+    setActiveId((cur) => (cur && doomed.has(cur) ? null : cur));
   }, []);
 
-  return { nodes, activeId, select: setActiveId, create, rename, setContent, toggleFavorite, remove };
+  return {
+    nodes, activeId, ready, status,
+    select: setActiveId, create, rename, setContent, toggleFavorite, remove,
+  };
 }
 
 export type Workspace = ReturnType<typeof useWorkspace>;
