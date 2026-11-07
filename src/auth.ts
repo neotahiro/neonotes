@@ -21,6 +21,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
   pages: { signIn: "/login", error: "/login" },
   callbacks: {
+    // Keep Google's refresh token inside the encrypted session cookie. It is never added to the
+    // session object, so the browser cannot read it; only our server routes can.
+    jwt({ token, account }) {
+      if (account?.refresh_token) token.refreshToken = account.refresh_token;
+      return token;
+    },
     // The allow-list. Anything that doesn't match is refused, including when settings are missing.
     signIn({ account, profile }) {
       if (account?.provider !== "google") return false;
