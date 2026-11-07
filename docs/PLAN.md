@@ -98,7 +98,7 @@ middleware.ts                      blocks every route except /login (step 4)
 1. **Plan + interface** — this step. Sidebar, tree, editor, toolbar, themes, mock in-memory data.
 2. Polish the interface (link popover instead of a prompt, keyboard shortcuts, delete confirmation dialog).
 3. Local persistence (IndexedDB) so the app works before Drive exists.
-4. Google sign-in with allow-list and route protection.
+4. Folders with several notes each (new notes go into the selected folder, move via dialog or drag and drop), then Google sign-in with allow-list and route protection.
 5. Drive storage: folder, file CRUD, favorites via `appProperties`.
 6. Autosave, offline queue, conflict handling.
 7. Hardening: headers, sanitizing, tests, deployment.
