@@ -40,10 +40,13 @@ export function AppShell() {
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           crumbs={crumbs}
+          status={ws.status}
           theme={theme}
           onToggleTheme={toggle}
         />
-        {active ? (
+        {!ws.ready ? (
+          <main className="flex-1" aria-busy="true" />
+        ) : active ? (
           <Editor
             key={active.id}
             title={active.name}

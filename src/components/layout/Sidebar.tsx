@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FilePlus, FolderPlus, Search, Star } from "lucide-react";
 import type { Workspace } from "@/hooks/useWorkspace";
 import type { WorkspaceNode } from "@/lib/types";
@@ -18,9 +18,23 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose, ws }: SidebarProps) {
   const [query, setQuery] = useState("");
-  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["f1"]));
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<WorkspaceNode | null>(null);
+
+  // After loading, open the folders that contain the current document.
+  useEffect(() => {
+    if (!ws.ready) return;
+    const ids: string[] = [];
+    let cur = ws.nodes.find((n) => n.id === ws.activeId);
+    while (cur?.parentId) {
+      const parentId: string = cur.parentId;
+      ids.push(parentId);
+      cur = ws.nodes.find((n) => n.id === parentId);
+    }
+    if (ids.length) setExpanded((s) => new Set([...s, ...ids]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ws.ready]);
 
   const expand = (id: string) => setExpanded((s) => new Set(s).add(id));
   const closeOnMobile = () => {
