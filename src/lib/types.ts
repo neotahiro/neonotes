@@ -9,5 +9,7 @@ export interface WorkspaceNode {
   favorite: boolean;
   /** TipTap HTML. Empty for folders. */
   content: string;
+  /** Sort key: notes appear in the order they were created. */
+  createdAt: number;
   updatedAt: number;
 }
