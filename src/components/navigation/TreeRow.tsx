@@ -1,9 +1,12 @@
 "use client";
 import { useState } from "react";
-import { ChevronRight, FilePlus, FileText, Folder, FolderOpen, Pencil, Star, Trash2 } from "lucide-react";
+import type { DragEvent } from "react";
+import { ChevronRight, FileText, FilePlus, Folder, FolderInput, FolderOpen, Pencil, Star, Trash2 } from "lucide-react";
 import type { WorkspaceNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { IconButton } from "@/components/ui/IconButton";
+
+export const DRAG_TYPE = "application/x-noenotes-id";
 
 export interface TreeActions {
   onSelect: (node: WorkspaceNode) => void;
@@ -14,6 +17,8 @@ export interface TreeActions {
   onDelete: (node: WorkspaceNode) => void;
   onFavorite: (id: string) => void;
   onAddDoc: (parentId: string) => void;
+  onMove: (node: WorkspaceNode) => void;
+  onDropOn: (draggedId: string, targetFolderId: string) => void;
 }
 
 interface TreeRowProps extends TreeActions {
@@ -32,13 +37,40 @@ export function TreeRow(p: TreeRowProps) {
   const { node, depth, active, expanded, editing } = p;
   const isFolder = node.kind === "folder";
   const [draft, setDraft] = useState(node.name);
+  const [over, setOver] = useState(false);
   const Icon = isFolder ? (expanded ? FolderOpen : Folder) : FileText;
+
+  const dropProps = isFolder
+    ? {
+        onDragOver: (e: DragEvent) => {
+          if (!e.dataTransfer.types.includes(DRAG_TYPE)) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          setOver(true);
+        },
+        onDragLeave: (e: DragEvent) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);
+        },
+        onDrop: (e: DragEvent) => {
+          e.preventDefault();
+          setOver(false);
+          const id = e.dataTransfer.getData(DRAG_TYPE);
+          if (id) p.onDropOn(id, node.id);
+        },
+      }
+    : {};
 
   return (
     <div
+      draggable={!editing}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(DRAG_TYPE, node.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      {...dropProps}
       className={cn(
         "group flex h-8 items-center gap-1 rounded-md pr-1 text-sm transition-colors",
-        active ? "bg-accent-soft text-ink" : "text-ink hover:bg-hover",
+        over ? "bg-accent-soft ring-1 ring-accent" : active ? "bg-accent-soft text-ink" : "text-ink hover:bg-hover",
       )}
       style={{ paddingLeft: 6 + depth * 14 }}
     >
@@ -94,6 +126,7 @@ export function TreeRow(p: TreeRowProps) {
               onClick={() => p.onFavorite(node.id)}
             />
           )}
+          <IconButton size="sm" icon={FolderInput} label="Move to…" onClick={() => p.onMove(node)} />
           <IconButton size="sm" icon={Pencil} label="Rename" onClick={() => p.onStartRename(node.id)} />
           <IconButton size="sm" icon={Trash2} label="Delete" onClick={() => p.onDelete(node)} />
         </div>

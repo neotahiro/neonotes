@@ -16,6 +16,20 @@ const byKindThenName = (a: WorkspaceNode, b: WorkspaceNode) =>
 
 export function FileTree({ nodes, parentId, depth = 0, ...rest }: FileTreeProps) {
   const children = nodes.filter((n) => n.parentId === parentId).sort(byKindThenName);
+
+  if (children.length === 0 && parentId !== null) {
+    return (
+      <button
+        type="button"
+        onClick={() => rest.onAddDoc(parentId)}
+        style={{ paddingLeft: 6 + depth * 14 + 20 }}
+        className="flex h-8 w-full items-center rounded-md text-left text-xs text-muted transition-colors hover:bg-hover hover:text-ink"
+      >
+        Empty · add a note
+      </button>
+    );
+  }
+
   return (
     <>
       {children.map((node) => {
