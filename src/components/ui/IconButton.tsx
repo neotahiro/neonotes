@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 interface IconButtonProps {
   icon: LucideIcon;
   label: string;
+  /** Shown in the tooltip, e.g. "Ctrl+B". */
+  shortcut?: string;
   onClick?: () => void;
   active?: boolean;
   disabled?: boolean;
@@ -11,11 +13,11 @@ interface IconButtonProps {
   className?: string;
 }
 
-export function IconButton({ icon: Icon, label, onClick, active, disabled, size = "md", className }: IconButtonProps) {
+export function IconButton({ icon: Icon, label, shortcut, onClick, active, disabled, size = "md", className }: IconButtonProps) {
   return (
     <button
       type="button"
-      title={label}
+      title={shortcut ? `${label} (${shortcut})` : label}
       aria-label={label}
       aria-pressed={active}
       disabled={disabled}
