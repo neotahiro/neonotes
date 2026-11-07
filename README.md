@@ -2,7 +2,7 @@
 
 A minimalist, distraction-free writing app. Next.js, TypeScript, Tailwind CSS, TipTap and Lucide.
 
-Status: **step 2 of 7** — interface with sample data, link bar, delete dialog and shortcuts. Nothing is saved yet, and there is no sign-in or Drive connection. See [docs/PLAN.md](docs/PLAN.md).
+Status: **step 3 of 7** — interface with notes saved in this browser (IndexedDB). No sign-in or Drive connection yet. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Run it
 
