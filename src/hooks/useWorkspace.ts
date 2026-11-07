@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { seedNodes } from "@/lib/mock-data";
 import { loadWorkspace, persist } from "@/lib/storage/localStore";
+import { descendantIds } from "@/lib/tree";
 import type { NodeKind, WorkspaceNode } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
@@ -144,25 +145,28 @@ export function useWorkspace() {
   }, []);
 
   const remove = useCallback((id: string) => {
-    const list = nodesRef.current;
-    const doomed = new Set([id]);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const n of list) {
-        if (n.parentId && doomed.has(n.parentId) && !doomed.has(n.id)) {
-          doomed.add(n.id);
-          grew = true;
-        }
-      }
-    }
-    setNodes(list.filter((n) => !doomed.has(n.id)));
+    const doomed = descendantIds(nodesRef.current, id);
+    setNodes(nodesRef.current.filter((n) => !doomed.has(n.id)));
     setActiveId((cur) => (cur && doomed.has(cur) ? null : cur));
+  }, []);
+
+  /** Moves a note or folder into another folder (or to the top level). Returns false if not allowed. */
+  const move = useCallback((id: string, parentId: string | null) => {
+    const list = nodesRef.current;
+    const node = list.find((n) => n.id === id);
+    if (!node || node.parentId === parentId) return false;
+    if (parentId !== null) {
+      const target = list.find((n) => n.id === parentId);
+      if (!target || target.kind !== "folder") return false;
+      if (descendantIds(list, id).has(parentId)) return false; // would nest a folder inside itself
+    }
+    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, parentId, updatedAt: Date.now() } : n)));
+    return true;
   }, []);
 
   return {
     nodes, activeId, ready, status,
-    select: setActiveId, create, rename, setContent, toggleFavorite, remove,
+    select: setActiveId, create, rename, setContent, toggleFavorite, remove, move,
   };
 }
 
