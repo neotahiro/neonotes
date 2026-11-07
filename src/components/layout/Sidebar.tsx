@@ -1,0 +1,158 @@
+"use client";
+import { useMemo, useState } from "react";
+import { FilePlus, FolderPlus, Search, Star } from "lucide-react";
+import type { Workspace } from "@/hooks/useWorkspace";
+import type { WorkspaceNode } from "@/lib/types";
+import { cn, stripHtml } from "@/lib/utils";
+import { FileTree } from "@/components/navigation/FileTree";
+import { TreeRow, type TreeActions } from "@/components/navigation/TreeRow";
+import { IconButton } from "@/components/ui/IconButton";
+import { ProfileMenu } from "./ProfileMenu";
+
+interface SidebarProps {
+  open: boolean;
+  onClose: () => void;
+  ws: Workspace;
+}
+
+export function Sidebar({ open, onClose, ws }: SidebarProps) {
+  const [query, setQuery] = useState("");
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set(["f1"]));
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const expand = (id: string) => setExpanded((s) => new Set(s).add(id));
+  const closeOnMobile = () => {
+    if (window.matchMedia("(max-width: 767px)").matches) onClose();
+  };
+
+  const actions: TreeActions = {
+    onSelect: (n) => { ws.select(n.id); closeOnMobile(); },
+    onToggle: (id) =>
+      setExpanded((s) => {
+        const next = new Set(s);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        return next;
+      }),
+    onStartRename: setEditingId,
+    onCommitRename: (id, name) => {
+      if (name.trim()) ws.rename(id, name.trim());
+      setEditingId(null);
+    },
+    onCancelRename: () => setEditingId(null),
+    onDelete: (n) => {
+      const what = n.kind === "folder" ? "this folder and everything in it" : `“${n.name || "Untitled"}”`;
+      if (window.confirm(`Delete ${what}?`)) ws.remove(n.id);
+    },
+    onFavorite: ws.toggleFavorite,
+    onAddDoc: (parentId) => {
+      expand(parentId);
+      setEditingId(ws.create("doc", parentId));
+    },
+  };
+
+  const q = query.trim().toLowerCase();
+  const results = useMemo(
+    () =>
+      q
+        ? ws.nodes.filter(
+            (n) => n.kind === "doc" && (n.name.toLowerCase().includes(q) || stripHtml(n.content).toLowerCase().includes(q)),
+          )
+        : [],
+    [q, ws.nodes],
+  );
+  const favorites = ws.nodes.filter((n) => n.kind === "doc" && n.favorite);
+  const folderName = (n: WorkspaceNode) => ws.nodes.find((p) => p.id === n.parentId)?.name;
+
+  const flatRow = (n: WorkspaceNode, hint?: string) => (
+    <TreeRow
+      key={n.id}
+      {...actions}
+      node={n}
+      depth={0}
+      active={n.id === ws.activeId}
+      expanded={false}
+      editing={n.id === editingId}
+      hint={hint}
+    />
+  );
+
+  return (
+    <>
+      {/* Mobile backdrop */}
+      <div
+        onClick={onClose}
+        aria-hidden
+        className={cn(
+          "fixed inset-0 z-30 bg-black/40 transition-opacity md:hidden",
+          open ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      />
+      <aside
+        aria-label="Documents"
+        className={cn(
+          "fixed inset-y-0 left-0 z-40 flex w-72 shrink-0 flex-col border-r border-line bg-sidebar transition-all duration-200",
+          "md:static md:z-auto",
+          open ? "translate-x-0" : "-translate-x-full md:translate-x-0 md:-ml-72",
+        )}
+      >
+        <div className="flex h-12 items-center justify-between px-3">
+          <span className="font-serif text-lg font-semibold tracking-tight">Noenotes</span>
+          <div className="flex items-center">
+            <IconButton icon={FilePlus} label="New document" onClick={() => setEditingId(ws.create("doc", null))} />
+            <IconButton icon={FolderPlus} label="New folder" onClick={() => setEditingId(ws.create("folder", null))} />
+          </div>
+        </div>
+
+        <div className="px-3 pb-2">
+          <label className="flex h-8 items-center gap-2 rounded-md border border-line bg-paper px-2 text-muted focus-within:border-accent">
+            <Search className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search documents"
+              aria-label="Search documents"
+              className="w-full bg-transparent text-sm text-ink outline-none placeholder:text-muted"
+            />
+          </label>
+        </div>
+
+        <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+          {q ? (
+            results.length ? (
+              results.map((n) => flatRow(n, folderName(n)))
+            ) : (
+              <p className="px-2 py-3 text-sm text-muted">No documents match “{query}”.</p>
+            )
+          ) : (
+            <>
+              {favorites.length > 0 && (
+                <section className="mb-3">
+                  <h2 className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted">
+                    <Star className="h-3 w-3" /> Favorites
+                  </h2>
+                  {favorites.map((n) => flatRow(n))}
+                </section>
+              )}
+              <section>
+                <h2 className="px-2 py-1 text-xs font-medium text-muted">Documents</h2>
+                <FileTree
+                  {...actions}
+                  nodes={ws.nodes}
+                  parentId={null}
+                  activeId={ws.activeId}
+                  expanded={expanded}
+                  editingId={editingId}
+                />
+                {ws.nodes.length === 0 && (
+                  <p className="px-2 py-3 text-sm text-muted">Nothing here yet. Create a document to begin.</p>
+                )}
+              </section>
+            </>
+          )}
+        </nav>
+
+        <ProfileMenu />
+      </aside>
+    </>
+  );
+}

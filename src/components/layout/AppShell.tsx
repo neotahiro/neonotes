@@ -1,0 +1,58 @@
+"use client";
+import { useEffect, useState } from "react";
+import { FilePlus } from "lucide-react";
+import { useTheme } from "@/hooks/useTheme";
+import { useWorkspace } from "@/hooks/useWorkspace";
+import { Editor } from "@/components/editor/Editor";
+import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
+
+export function AppShell() {
+  const ws = useWorkspace();
+  const { theme, toggle } = useTheme();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 767px)").matches) setSidebarOpen(false);
+  }, []);
+
+  const active = ws.nodes.find((n) => n.id === ws.activeId && n.kind === "doc") ?? null;
+  const parent = active ? ws.nodes.find((n) => n.id === active.parentId) : null;
+  const crumbs = active ? [...(parent ? [parent.name] : []), active.name || "Untitled"] : [];
+
+  return (
+    <div className="flex h-dvh overflow-hidden">
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} ws={ws} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar
+          sidebarOpen={sidebarOpen}
+          onToggleSidebar={() => setSidebarOpen((o) => !o)}
+          crumbs={crumbs}
+          theme={theme}
+          onToggleTheme={toggle}
+        />
+        {active ? (
+          <Editor
+            key={active.id}
+            title={active.name}
+            content={active.content}
+            onTitleChange={(name) => ws.rename(active.id, name)}
+            onContentChange={(html) => ws.setContent(active.id, html)}
+          />
+        ) : (
+          <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+            <p className="font-serif text-xl">Nothing open</p>
+            <p className="max-w-xs text-sm text-muted">Pick a document from the sidebar, or start a new one.</p>
+            <button
+              type="button"
+              onClick={() => ws.create("doc", null)}
+              className="mt-1 inline-flex items-center gap-2 rounded-md bg-accent px-3.5 py-2 text-sm font-medium text-paper transition-opacity hover:opacity-90"
+            >
+              <FilePlus className="h-4 w-4" strokeWidth={1.75} /> New document
+            </button>
+          </main>
+        )}
+      </div>
+    </div>
+  );
+}
