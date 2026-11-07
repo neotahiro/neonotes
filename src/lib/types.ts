@@ -13,3 +13,9 @@ export interface WorkspaceNode {
   createdAt: number;
   updatedAt: number;
 }
+
+export interface UserInfo {
+  name: string;
+  email: string;
+  image: string | null;
+}
