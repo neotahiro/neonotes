@@ -49,7 +49,7 @@ export function AppShell({ user }: { user: UserInfo }) {
           <main className="flex-1" aria-busy="true" />
         ) : active ? (
           <Editor
-            key={active.id}
+            key={`${active.id}:${ws.revision}`}
             title={active.name}
             content={active.content}
             onTitleChange={(name) => ws.rename(active.id, name)}

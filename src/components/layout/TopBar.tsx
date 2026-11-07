@@ -19,8 +19,19 @@ interface TopBarProps {
 const statusText: Record<SaveStatus, string> = {
   loading: "",
   saving: "Saving…",
-  saved: "Saved on this device",
-  error: "Not saved: browser storage is unavailable",
+  synced: "Saved to Google Drive",
+  offline: "Saved on this device. Drive sync will retry.",
+  reauth: "Drive disconnected. Sign out and sign in again.",
+  error: "Not saved. Check your connection.",
+};
+
+const tone: Record<SaveStatus, string> = {
+  loading: "hidden",
+  saving: "hidden text-muted sm:inline",
+  synced: "hidden text-muted sm:inline",
+  offline: "text-muted",
+  reauth: "text-red-600 dark:text-red-400",
+  error: "text-red-600 dark:text-red-400",
 };
 
 export function TopBar({ sidebarOpen, onToggleSidebar, crumbs, status, theme, onToggleTheme }: TopBarProps) {
@@ -37,10 +48,7 @@ export function TopBar({ sidebarOpen, onToggleSidebar, crumbs, status, theme, on
       <span
         role="status"
         aria-live="polite"
-        className={cn(
-          "text-xs",
-          status === "error" ? "text-red-600 dark:text-red-400" : "hidden text-muted sm:inline",
-        )}
+        className={cn("max-w-[45%] truncate text-xs", tone[status])}
       >
         {statusText[status]}
       </span>
