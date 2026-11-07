@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { FilePlus, FolderPlus, Search, Star } from "lucide-react";
 import type { Workspace } from "@/hooks/useWorkspace";
-import type { WorkspaceNode } from "@/lib/types";
+import type { UserInfo, WorkspaceNode } from "@/lib/types";
 import { cn, stripHtml } from "@/lib/utils";
 import { FileTree } from "@/components/navigation/FileTree";
 import { DRAG_TYPE, TreeRow, type TreeActions } from "@/components/navigation/TreeRow";
@@ -15,9 +15,10 @@ interface SidebarProps {
   open: boolean;
   onClose: () => void;
   ws: Workspace;
+  user: UserInfo;
 }
 
-export function Sidebar({ open, onClose, ws }: SidebarProps) {
+export function Sidebar({ open, onClose, ws, user }: SidebarProps) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -221,7 +222,7 @@ export function Sidebar({ open, onClose, ws }: SidebarProps) {
           )}
         </nav>
 
-        <ProfileMenu />
+        <ProfileMenu user={user} />
       </aside>
 
       <ConfirmDialog

@@ -1,13 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import { FilePlus } from "lucide-react";
+import type { UserInfo } from "@/lib/types";
 import { useTheme } from "@/hooks/useTheme";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { Editor } from "@/components/editor/Editor";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
-export function AppShell() {
+export function AppShell({ user }: { user: UserInfo }) {
   const ws = useWorkspace();
   const { theme, toggle } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -34,7 +35,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} ws={ws} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} ws={ws} user={user} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           sidebarOpen={sidebarOpen}
