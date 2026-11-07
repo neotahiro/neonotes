@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { seedNodes } from "@/lib/mock-data";
 import { loadWorkspace, persist } from "@/lib/storage/localStore";
-import { descendantIds } from "@/lib/tree";
+import { byCreated, descendantIds } from "@/lib/tree";
 import type { NodeKind, WorkspaceNode } from "@/lib/types";
 import { uid } from "@/lib/utils";
 
@@ -45,6 +45,14 @@ export function useWorkspace() {
           }
           await persist({ put: list, meta: { seeded: true, activeId: active } });
         }
+        // Older saves have no creation time: use the last-edit time once, and save it.
+        const legacy = list.filter((n) => typeof n.createdAt !== "number");
+        if (legacy.length) {
+          const fixed = legacy.map((n) => ({ ...n, createdAt: n.updatedAt }));
+          await persist({ put: fixed });
+          list = list.map((n) => fixed.find((f) => f.id === n.id) ?? n);
+        }
+        list = [...list].sort(byCreated);
         if (cancelled) return;
         if (!list.some((n) => n.id === active && n.kind === "doc")) active = null;
         persisted.current = new Map(list.map((n) => [n.id, n]));
@@ -126,7 +134,8 @@ export function useWorkspace() {
 
   const create = useCallback((kind: NodeKind, parentId: string | null = null) => {
     const node: WorkspaceNode = {
-      id: uid(), kind, parentId, favorite: false, content: "", updatedAt: Date.now(),
+      id: uid(), kind, parentId, favorite: false, content: "",
+      createdAt: Date.now(), updatedAt: Date.now(),
       name: kind === "doc" ? "Untitled" : "New folder",
     };
     setNodes((prev) => [...prev, node]);
