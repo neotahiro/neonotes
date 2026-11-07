@@ -11,12 +11,14 @@ export interface StoredWorkspace {
   nodes: WorkspaceNode[];
   activeId: string | null;
   seeded: boolean;
+  /** Drive ids of notes deleted here that still need to be trashed in Drive. */
+  pendingDeletes: string[];
 }
 
 export interface PersistBatch {
   put?: WorkspaceNode[];
   remove?: string[];
-  meta?: { activeId?: string | null; seeded?: boolean };
+  meta?: { activeId?: string | null; seeded?: boolean; pendingDeletes?: string[] };
 }
 
 let dbPromise: Promise<IDBDatabase> | null = null;
@@ -56,15 +58,17 @@ const wrap = <T,>(req: IDBRequest<T>) =>
 export async function loadWorkspace(): Promise<StoredWorkspace> {
   const db = await getDb();
   const tx = db.transaction(["nodes", "meta"], "readonly");
-  const [nodes, activeId, seeded] = await Promise.all([
+  const [nodes, activeId, seeded, pendingDeletes] = await Promise.all([
     wrap(tx.objectStore("nodes").getAll()),
     wrap(tx.objectStore("meta").get("activeId")),
     wrap(tx.objectStore("meta").get("seeded")),
+    wrap(tx.objectStore("meta").get("pendingDeletes")),
   ]);
   return {
     nodes: nodes as WorkspaceNode[],
     activeId: typeof activeId === "string" ? activeId : null,
     seeded: seeded === true,
+    pendingDeletes: Array.isArray(pendingDeletes) ? (pendingDeletes as string[]) : [],
   };
 }
 
@@ -79,6 +83,7 @@ export async function persist(batch: PersistBatch): Promise<void> {
   batch.remove?.forEach((id) => nodes.delete(id));
   if (batch.meta && "activeId" in batch.meta) meta.put(batch.meta.activeId ?? null, "activeId");
   if (batch.meta?.seeded !== undefined) meta.put(batch.meta.seeded, "seeded");
+  if (batch.meta?.pendingDeletes) meta.put(batch.meta.pendingDeletes, "pendingDeletes");
 
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
