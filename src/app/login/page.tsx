@@ -1,4 +1,5 @@
 import { signIn } from "@/auth";
+import { Logo } from "@/components/ui/Logo";
 
 const messages: Record<string, string> = {
   AccessDenied: "That Google account isn’t allowed to use this app.",
@@ -8,13 +9,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { error } = await searchParams;
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-6">
+    <main className="flex min-h-dvh items-center justify-center px-6 pb-16">
       <div className="w-full max-w-sm text-center">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight">NeoNotes</h1>
-        <p className="mt-2 text-sm text-muted">A quiet place to write.</p>
+        <Logo size={72} className="mx-auto rounded-[1.4rem] shadow-lg ring-1 ring-line" />
+        <h1 className="mt-7 font-serif text-4xl font-semibold tracking-tight">NeoNotes</h1>
+        <p className="mt-3 font-serif text-lg italic text-muted">
+          A quiet place to write.<span aria-hidden className="caret" />
+        </p>
 
         <form
-          className="mt-8"
+          className="mt-10"
           action={async () => {
             "use server";
             await signIn("google", { redirectTo: "/" });
@@ -33,6 +37,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             Sign in with Google
           </button>
         </form>
+
+        <p className="mt-5 text-xs text-muted">Your notes live in your own Google Drive.</p>
 
         {error && (
           <p role="alert" className="mt-4 text-sm text-red-600 dark:text-red-400">
