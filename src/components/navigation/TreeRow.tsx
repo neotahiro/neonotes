@@ -12,7 +12,8 @@ export interface TreeActions {
   onSelect: (node: WorkspaceNode) => void;
   onToggle: (id: string) => void;
   onStartRename: (id: string) => void;
-  onCommitRename: (id: string, name: string) => void;
+  /** viaEnter is true when the person pressed Enter (as opposed to clicking away). */
+  onCommitRename: (id: string, name: string, viaEnter?: boolean) => void;
   onCancelRename: () => void;
   onDelete: (node: WorkspaceNode) => void;
   onFavorite: (id: string) => void;
@@ -96,7 +97,7 @@ export function TreeRow(p: TreeRowProps) {
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => p.onCommitRename(node.id, draft)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") p.onCommitRename(node.id, draft);
+            if (e.key === "Enter") p.onCommitRename(node.id, draft, true);
             if (e.key === "Escape") p.onCancelRename();
           }}
           className="min-w-0 flex-1 rounded border border-line bg-paper px-1.5 py-0.5 text-sm outline-none focus:border-accent"
