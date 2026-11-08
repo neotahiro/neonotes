@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { pullFromDrive, pushToDrive, type SyncEnv } from "@/lib/sync/engine";
 import { isDirty } from "@/lib/sync/merge";
+import { getDeviceId } from "@/lib/sync/device";
 import { remoteApi, SyncError } from "@/lib/sync/remote";
 import type { WorkspaceNode } from "@/lib/types";
 
@@ -19,6 +20,7 @@ interface Args {
   mutate: SyncEnv["mutate"];
   mutatePending: SyncEnv["mutatePending"];
   onRefreshed: (id: string) => void;
+  onConflict: (copyName: string) => void;
 }
 
 /** Keeps the workspace in step with Google Drive: pulls on start and when you return, pushes shortly after edits. */
@@ -50,6 +52,8 @@ export function useDriveSync(a: Args) {
       mutate: a.mutate,
       mutatePending: a.mutatePending,
       onRefreshed: a.onRefreshed,
+      onConflict: a.onConflict,
+      deviceId: getDeviceId(),
       api: remoteApi,
     };
     try {
@@ -108,5 +112,17 @@ export function useDriveSync(a: Args) {
     };
   }, [retry]);
 
-  return { driveState, hasWork };
+  // If Drive can't be reached, warn before the tab is closed with changes that exist only on this device.
+  const atRisk = hasWork && (driveState === "offline" || driveState === "reauth");
+  useEffect(() => {
+    if (!atRisk) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [atRisk]);
+
+  return { driveState, hasWork, syncNow: retry };
 }

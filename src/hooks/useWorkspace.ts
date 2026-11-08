@@ -26,6 +26,7 @@ export function useWorkspace() {
   const [ready, setReady] = useState(false);
   const [localStatus, setLocalStatus] = useState<"loading" | "saving" | "saved" | "error">("loading");
   const [revision, setRevision] = useState(0); // bumps when a pull replaces the open document's text
+  const [notice, setNotice] = useState<string | null>(null);
 
   const nodesRef = useRef<WorkspaceNode[]>([]);
   const pendingRef = useRef<string[]>([]);
@@ -182,11 +183,13 @@ export function useWorkspace() {
     };
   }, [flush]);
 
-  const { driveState, hasWork } = useDriveSync({
+  const { driveState, hasWork, syncNow } = useDriveSync({
     ready, nodes, pendingDeletes, nodesRef, pendingRef, mutate, mutatePending,
     onRefreshed: (id) => {
       if (activeRef.current === id) setRevision((r) => r + 1);
     },
+    onConflict: (copyName) =>
+      setNotice(`Two devices changed the same note. Your version stayed, and the other version was kept as “${copyName}”.`),
   });
 
   const create = useCallback(
@@ -260,7 +263,7 @@ export function useWorkspace() {
     : "saving";
 
   return {
-    nodes, activeId, ready, status, revision,
+    nodes, activeId, ready, status, revision, notice, dismissNotice: () => setNotice(null), syncNow,
     select: setActive, create, rename, setContent, toggleFavorite, remove, move,
   };
 }
