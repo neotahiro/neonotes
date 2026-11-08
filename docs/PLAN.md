@@ -79,7 +79,7 @@ middleware.ts                      blocks every route except /login (step 4)
 4. Failures retry with exponential backoff and a retry when the browser comes back online.
 5. A draft is removed only after Drive confirms the write.
 6. `beforeunload` warns if unsynced drafts exist.
-7. On conflict, keep both: the Drive version stays, the local one is saved as "Title (conflict copy)".
+7. On conflict, keep both: your version stays as the note, and the other device's version is saved as "Title (conflict copy YYYY-MM-DD)". Each write carries a device id and the Drive modified time it was based on; the server refuses a write if another device changed the file in between (HTTP 409).
 
 ## 7. Security considerations
 
