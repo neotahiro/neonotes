@@ -42,6 +42,8 @@ export interface RemoteNode {
   favorite: boolean;
   createdAt: number;
   modified: string;
+  /** Id of the device that last wrote this file. */
+  writer?: string;
 }
 
 export interface CreateBody {
@@ -52,6 +54,7 @@ export interface CreateBody {
   createdAt: number;
   parentDriveId: string | null;
   content: string;
+  writer?: string;
 }
 
 export interface UpdateBody {
@@ -61,9 +64,18 @@ export interface UpdateBody {
   parentDriveId?: string | null;
   content?: string;
   trashed?: boolean;
+  /** Drive's modifiedTime as we last saw it. If Drive has moved on (written by another device), the update is refused with 409. */
+  expectedModified?: string;
+  writer?: string;
 }
 
 export interface RemoteResult {
   id: string;
   modified: string;
+}
+
+export interface RemoteFile {
+  name: string;
+  modified: string;
+  content: string;
 }
