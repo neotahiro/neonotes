@@ -2,7 +2,7 @@
 
 A minimalist, distraction-free writing app. Next.js, TypeScript, Tailwind CSS, TipTap and Lucide.
 
-Status: **step 6 of 7** — notes and folders are saved to the owner's Google Drive (Noenotes folder) and cached in this browser (IndexedDB). If two devices change the same note, both versions are kept. See [docs/PLAN.md](docs/PLAN.md).
+Notes and folders are saved to the owner's Google Drive (Noenotes folder) and cached in this browser (IndexedDB). If two devices change the same note, both versions are kept. See [docs/PLAN.md](docs/PLAN.md).
 
 ## Run it
 
