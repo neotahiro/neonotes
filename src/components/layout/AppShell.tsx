@@ -13,6 +13,7 @@ export function AppShell({ user }: { user: UserInfo }) {
   const ws = useWorkspace();
   const { theme, toggle } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [focusSignal, setFocusSignal] = useState(0);
 
   useEffect(() => {
     if (window.matchMedia("(max-width: 767px)").matches) setSidebarOpen(false);
@@ -36,7 +37,7 @@ export function AppShell({ user }: { user: UserInfo }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} ws={ws} user={user} />
+      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} ws={ws} user={user} onFocusEditor={() => setFocusSignal((n) => n + 1)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar
           sidebarOpen={sidebarOpen}
@@ -53,6 +54,7 @@ export function AppShell({ user }: { user: UserInfo }) {
         ) : active ? (
           <Editor
             key={`${active.id}:${ws.revision}`}
+            focusSignal={focusSignal}
             title={active.name}
             content={active.content}
             onTitleChange={(name) => ws.rename(active.id, name)}

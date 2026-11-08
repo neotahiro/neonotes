@@ -14,11 +14,13 @@ import { ProfileMenu } from "./ProfileMenu";
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
+  /** Moves the cursor into the open note's text. */
+  onFocusEditor: () => void;
   ws: Workspace;
   user: UserInfo;
 }
 
-export function Sidebar({ open, onClose, ws, user }: SidebarProps) {
+export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -72,9 +74,14 @@ export function Sidebar({ open, onClose, ws, user }: SidebarProps) {
       });
     },
     onStartRename: setEditingId,
-    onCommitRename: (id, name) => {
+    onCommitRename: (id, name, viaEnter) => {
       if (name.trim()) ws.rename(id, name.trim());
       setEditingId(null);
+      // Pressing Enter on the open note's name (e.g. a brand-new note) goes straight to writing.
+      if (viaEnter && id === ws.activeId) {
+        closeOnMobile();
+        onFocusEditor();
+      }
     },
     onCancelRename: () => setEditingId(null),
     onDelete: setPendingDelete,
@@ -134,7 +141,7 @@ export function Sidebar({ open, onClose, ws, user }: SidebarProps) {
         )}
       >
         <div className="flex h-12 items-center justify-between px-3">
-          <span className="font-serif text-lg font-semibold tracking-tight">Noenotes</span>
+          <span className="font-serif text-lg font-semibold tracking-tight">NeoNotes</span>
           <div className="flex items-center">
             <IconButton
               icon={FilePlus}
