@@ -1,4 +1,4 @@
-# Noenotes
+# NeoNotes
 
 A minimalist, distraction-free writing app. Next.js, TypeScript, Tailwind CSS, TipTap and Lucide.
 
