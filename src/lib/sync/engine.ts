@@ -1,4 +1,5 @@
 import type { SyncInfo, WorkspaceNode } from "@/lib/types";
+import { uid } from "@/lib/utils";
 import { applyPlan, isDirty, planPull } from "./merge";
 import { SyncError, type RemoteApi } from "./remote";
 
@@ -11,6 +12,10 @@ export interface SyncEnv {
   mutate: (fn: (prev: WorkspaceNode[]) => WorkspaceNode[]) => void;
   mutatePending: (fn: (prev: string[]) => string[]) => void;
   onRefreshed: (id: string) => void;
+  /** Called with the name of the conflict copy that was created. */
+  onConflict: (copyName: string) => void;
+  /** Identifies this browser, so our own earlier saves aren't mistaken for another device's. */
+  deviceId: string;
   api: RemoteApi;
 }
 
@@ -19,7 +24,7 @@ const CONTENT_BATCH = 4;
 /** Brings in whatever changed in Drive. */
 export async function pullFromDrive(env: SyncEnv): Promise<void> {
   const remote = await env.api.list();
-  const plan = planPull(env.nodes(), remote, env.pending());
+  const plan = planPull(env.nodes(), remote, env.pending(), env.deviceId);
 
   const contents = new Map<string, string>();
   const need = plan.items.filter((i) => i.needsContent);
@@ -38,6 +43,39 @@ export async function pullFromDrive(env: SyncEnv): Promise<void> {
     return result.nodes;
   });
   refreshed.forEach(env.onRefreshed);
+
+  if (plan.adopt.length) {
+    const times = new Map(plan.adopt.map((a) => [a.id, a.modified]));
+    env.mutate((prev) =>
+      prev.map((n) => (n.sync && times.has(n.id) ? { ...n, sync: { ...n.sync, modified: times.get(n.id)! } } : n)),
+    );
+  }
+  for (const c of plan.conflicts) {
+    const node = env.nodes().find((n) => n.id === c.id);
+    if (node?.sync) await resolveConflict(env, node);
+  }
+}
+
+/**
+ * Another device changed this note too. Keep the local version as the note, save Drive's version as a
+ * separate "conflict copy" (if its text is different), and remember Drive's new time so our save goes through.
+ */
+export async function resolveConflict(env: SyncEnv, node: WorkspaceNode): Promise<void> {
+  const remote = await env.api.get(node.sync!.driveId);
+  let copy: WorkspaceNode | null = null;
+  if (node.kind === "doc" && remote.content !== node.content) {
+    const now = Date.now();
+    copy = {
+      id: uid(), kind: "doc", parentId: node.parentId, favorite: false, content: remote.content,
+      name: `${remote.name || "Untitled"} (conflict copy ${new Date(now).toISOString().slice(0, 10)})`,
+      createdAt: now, updatedAt: now,
+    };
+  }
+  env.mutate((prev) => {
+    const next = prev.map((n) => (n.id === node.id && n.sync ? { ...n, sync: { ...n.sync, modified: remote.modified } } : n));
+    return copy ? [...next, copy] : next;
+  });
+  if (copy) env.onConflict(copy.name);
 }
 
 /** Sends local changes to Drive: trashes deleted notes, creates new ones, updates changed ones. */
@@ -81,25 +119,38 @@ export async function pushToDrive(env: SyncEnv): Promise<void> {
     const name = n.name.trim() || "Untitled";
 
     if (n.sync) {
-      const body: Parameters<RemoteApi["update"]>[1] = { name, favorite: n.favorite };
-      if (n.parentId !== n.sync.parentId) body.parentDriveId = parentDrive ?? null;
-      if (n.kind === "doc") body.content = n.content;
-      try {
-        const res = await env.api.update(n.sync.driveId, body);
-        markSynced(n, res.id, res.modified);
-      } catch (err) {
-        if (err instanceof SyncError && err.status === 404) {
-          // It was removed from Drive behind our back: forget the link so it's created again.
-          driveIds.delete(n.id);
-          env.mutate((prev) => prev.map((x) => (x.id === n.id ? { ...x, sync: undefined } : x)));
-          continue;
+      let current: WorkspaceNode = n;
+      for (let attempt = 0; ; attempt++) {
+        const body: Parameters<RemoteApi["update"]>[1] = {
+          name, favorite: n.favorite, expectedModified: current.sync!.modified, writer: env.deviceId,
+        };
+        if (n.parentId !== n.sync.parentId) body.parentDriveId = parentDrive ?? null;
+        if (n.kind === "doc") body.content = n.content;
+        try {
+          const res = await env.api.update(n.sync.driveId, body);
+          markSynced(n, res.id, res.modified);
+          break;
+        } catch (err) {
+          if (err instanceof SyncError && err.status === 409 && attempt === 0) {
+            await resolveConflict(env, current);
+            current = env.nodes().find((x) => x.id === n.id) ?? current;
+            if (!current.sync) break;
+            continue;
+          }
+          if (err instanceof SyncError && err.status === 404) {
+            // It was removed from Drive behind our back: forget the link so it's created again.
+            driveIds.delete(n.id);
+            env.mutate((prev) => prev.map((x) => (x.id === n.id ? { ...x, sync: undefined } : x)));
+            break;
+          }
+          throw err;
         }
-        throw err;
       }
     } else {
       const res = await env.api.create({
         localId: n.id, kind: n.kind, name, favorite: n.favorite, createdAt: n.createdAt,
         parentDriveId: parentDrive ?? null, content: n.kind === "doc" ? n.content : "",
+        writer: env.deviceId,
       });
       driveIds.set(n.id, res.id);
       markSynced(n, res.id, res.modified);
