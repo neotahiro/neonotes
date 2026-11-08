@@ -5,6 +5,7 @@ import type { UserInfo } from "@/lib/types";
 import { useTheme } from "@/hooks/useTheme";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { Editor } from "@/components/editor/Editor";
+import { NoticeBar } from "./NoticeBar";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 
@@ -42,9 +43,11 @@ export function AppShell({ user }: { user: UserInfo }) {
           onToggleSidebar={() => setSidebarOpen((o) => !o)}
           crumbs={crumbs}
           status={ws.status}
+          onRetry={ws.syncNow}
           theme={theme}
           onToggleTheme={toggle}
         />
+        {ws.notice && <NoticeBar message={ws.notice} onDismiss={ws.dismissNotice} />}
         {!ws.ready ? (
           <main className="flex-1" aria-busy="true" />
         ) : active ? (

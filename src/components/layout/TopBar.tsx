@@ -12,6 +12,7 @@ interface TopBarProps {
   onToggleSidebar: () => void;
   crumbs: string[];
   status: SaveStatus;
+  onRetry: () => void;
   theme: Theme;
   onToggleTheme: () => void;
 }
@@ -34,7 +35,7 @@ const tone: Record<SaveStatus, string> = {
   error: "text-red-600 dark:text-red-400",
 };
 
-export function TopBar({ sidebarOpen, onToggleSidebar, crumbs, status, theme, onToggleTheme }: TopBarProps) {
+export function TopBar({ sidebarOpen, onToggleSidebar, crumbs, status, onRetry, theme, onToggleTheme }: TopBarProps) {
   const mod = useModKey();
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 px-3">
@@ -45,13 +46,20 @@ export function TopBar({ sidebarOpen, onToggleSidebar, crumbs, status, theme, on
         onClick={onToggleSidebar}
       />
       <p className="min-w-0 flex-1 truncate text-sm text-muted">{crumbs.join(" / ")}</p>
-      <span
-        role="status"
-        aria-live="polite"
-        className={cn("max-w-[45%] truncate text-xs", tone[status])}
-      >
-        {statusText[status]}
-      </span>
+      {status === "offline" ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          title="Try syncing now"
+          className={cn("max-w-[45%] truncate text-xs underline-offset-2 hover:underline", tone[status])}
+        >
+          {statusText[status]} Retry now
+        </button>
+      ) : (
+        <span role="status" aria-live="polite" className={cn("max-w-[45%] truncate text-xs", tone[status])}>
+          {statusText[status]}
+        </span>
+      )}
       <ThemeToggle theme={theme} onToggle={onToggleTheme} />
     </header>
   );
