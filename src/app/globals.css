@@ -9,8 +9,8 @@
   --muted: #667284;
   --line: #dde1e8;
   --hover: #e2e6ed;
-  --accent: #2e6f68;
-  --accent-soft: #d7e8e5;
+  --accent: #0e7490; /* the icon's cyan, deepened so text stays readable on light paper */
+  --accent-soft: #dcf1f6;
 }
 .dark {
   --paper: #14181d;
@@ -19,8 +19,8 @@
   --muted: #8a94a2;
   --line: #262d36;
   --hover: #1d242c;
-  --accent: #6db8ae;
-  --accent-soft: #1b2e2c;
+  --accent: #22d3ee; /* the icon's cyan */
+  --accent-soft: #0f2a33;
 }
 
 html, body { height: 100%; }
