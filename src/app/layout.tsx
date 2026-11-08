@@ -6,7 +6,7 @@ const sans = Figtree({ subsets: ["latin"], variable: "--font-sans", display: "sw
 const serif = Literata({ subsets: ["latin"], variable: "--font-serif", display: "swap" });
 
 export const metadata: Metadata = {
-  title: "Noenotes",
+  title: "NeoNotes",
   description: "A quiet place to write.",
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
