@@ -2,7 +2,7 @@
  * Server-only Google Drive helpers. With the drive.file permission, Drive only
  * ever shows this app the files it created itself.
  */
-import type { CreateBody, RemoteNode, RemoteResult, UpdateBody } from "@/lib/types";
+import type { CreateBody, RemoteFile, RemoteNode, RemoteResult, UpdateBody } from "@/lib/types";
 
 const API = "https://www.googleapis.com/drive/v3";
 const UPLOAD = "https://www.googleapis.com/upload/drive/v3";
@@ -10,6 +10,13 @@ const FOLDER_MIME = "application/vnd.google-apps.folder";
 const DOC_MIME = "text/html";
 
 export const ROOT_FOLDER_NAME = "Noenotes";
+
+/** Another device changed the file since we last saw it. */
+export class ConflictError extends Error {
+  constructor() {
+    super("conflict");
+  }
+}
 
 export class DriveError extends Error {
   constructor(public status: number, message: string) {
@@ -99,6 +106,7 @@ export async function listNodes(token: string, rootId: string): Promise<RemoteNo
         favorite: f.appProperties?.favorite === "true",
         createdAt: Number(f.appProperties?.createdAt) || Date.parse(f.modifiedTime),
         modified: f.modifiedTime,
+        writer: f.appProperties?.writer,
       });
     }
     pageToken = page.nextPageToken;
@@ -111,23 +119,45 @@ export async function getContent(token: string, id: string): Promise<string> {
   return res.text();
 }
 
+/** One note's current name, modified time and content. */
+export async function getFile(token: string, id: string): Promise<RemoteFile> {
+  const meta = await driveRequest<{ name: string; modifiedTime: string }>(token, `/files/${id}?fields=name,modifiedTime`);
+  return { name: meta.name, modified: meta.modifiedTime, content: await getContent(token, id) };
+}
+
 export async function updateNode(token: string, rootId: string, id: string, patch: UpdateBody): Promise<RemoteResult> {
   const params = new URLSearchParams({ fields: "id,modifiedTime" });
 
-  if (patch.parentDriveId !== undefined) {
-    const current = await driveRequest<{ parents?: string[] }>(token, `/files/${id}?fields=parents`);
-    const target = patch.parentDriveId ?? rootId;
-    const parents = current.parents ?? [];
-    if (!parents.includes(target)) {
-      params.set("addParents", target);
-      const old = parents.filter((p) => p !== target);
-      if (old.length) params.set("removeParents", old.join(","));
+  if (patch.parentDriveId !== undefined || patch.expectedModified !== undefined) {
+    const current = await driveRequest<{ parents?: string[]; modifiedTime: string; appProperties?: Record<string, string> }>(
+      token,
+      `/files/${id}?fields=parents,modifiedTime,appProperties`,
+    );
+    // Refuse to overwrite a change made by a different device that we haven't seen.
+    if (
+      patch.expectedModified !== undefined &&
+      current.modifiedTime !== patch.expectedModified &&
+      !(patch.writer && current.appProperties?.writer === patch.writer)
+    ) {
+      throw new ConflictError();
+    }
+    if (patch.parentDriveId !== undefined) {
+      const target = patch.parentDriveId ?? rootId;
+      const parents = current.parents ?? [];
+      if (!parents.includes(target)) {
+        params.set("addParents", target);
+        const old = parents.filter((p) => p !== target);
+        if (old.length) params.set("removeParents", old.join(","));
+      }
     }
   }
 
   const metadata: Record<string, unknown> = {};
   if (patch.name !== undefined) metadata.name = patch.name;
-  if (patch.favorite !== undefined) metadata.appProperties = { favorite: String(patch.favorite) };
+  const props: Record<string, string> = {};
+  if (patch.favorite !== undefined) props.favorite = String(patch.favorite);
+  if (patch.writer) props.writer = patch.writer;
+  if (Object.keys(props).length) metadata.appProperties = props;
   if (patch.trashed) metadata.trashed = true; // goes to the Drive trash, so it's recoverable
 
   let file: DriveFile;
@@ -153,6 +183,7 @@ export async function createNode(token: string, rootId: string, input: CreateBod
       favorite: input.favorite,
       parentDriveId: input.parentDriveId,
       content: input.kind === "doc" ? input.content : undefined,
+      writer: input.writer,
     });
   }
 
@@ -165,6 +196,7 @@ export async function createNode(token: string, rootId: string, input: CreateBod
       localId: input.localId,
       favorite: String(input.favorite),
       createdAt: String(input.createdAt),
+      ...(input.writer ? { writer: input.writer } : {}),
     },
   };
   const file =

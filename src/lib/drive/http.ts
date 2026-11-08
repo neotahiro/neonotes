@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { CreateBody, UpdateBody } from "@/lib/types";
 import { DriveAuthError, getDriveAccess } from "./access";
-import { DriveError, ensureRootFolder } from "./drive";
+import { ConflictError, DriveError, ensureRootFolder } from "./drive";
 
 const noStore = { "Cache-Control": "no-store" };
 const MAX_CONTENT = 3_000_000; // characters; Vercel rejects request bodies over ~4.5 MB
@@ -37,6 +37,7 @@ export async function withDrive(
     return await handler({ token, rootId });
   } catch (err) {
     if (err instanceof DriveAuthError) return json({ reason: err.reason }, 401);
+    if (err instanceof ConflictError) return json({ conflict: true }, 409);
     if (err instanceof DriveError && err.status === 404) return json({ error: "Not found" }, 404);
     console.error("Drive route failed:", err);
     return json({ error: "Drive request failed" }, 502);
@@ -58,13 +59,15 @@ export function parseCreate(b: unknown): CreateBody | null {
     typeof b.favorite !== "boolean" ||
     typeof b.createdAt !== "number" || !Number.isFinite(b.createdAt) ||
     !parentOk(b.parentDriveId ?? null) ||
-    content.length > MAX_CONTENT
+    content.length > MAX_CONTENT ||
+    (b.writer !== undefined && !(typeof b.writer === "string" && ID_RE.test(b.writer)))
   ) {
     return null;
   }
   return {
     localId: b.localId, kind: b.kind, name, favorite: b.favorite, createdAt: b.createdAt,
     parentDriveId: (b.parentDriveId ?? null) as string | null, content,
+    writer: typeof b.writer === "string" ? b.writer : undefined,
   };
 }
 
@@ -87,6 +90,14 @@ export function parseUpdate(b: unknown): UpdateBody | null {
   if (b.content !== undefined) {
     if (typeof b.content !== "string" || b.content.length > MAX_CONTENT) return null;
     out.content = b.content;
+  }
+  if (b.expectedModified !== undefined) {
+    if (typeof b.expectedModified !== "string" || b.expectedModified.length > 40) return null;
+    out.expectedModified = b.expectedModified;
+  }
+  if (b.writer !== undefined) {
+    if (typeof b.writer !== "string" || !ID_RE.test(b.writer)) return null;
+    out.writer = b.writer;
   }
   if (b.trashed !== undefined) {
     if (b.trashed !== true) return null;
