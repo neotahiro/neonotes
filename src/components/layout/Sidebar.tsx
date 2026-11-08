@@ -8,6 +8,7 @@ import { FileTree } from "@/components/navigation/FileTree";
 import { DRAG_TYPE, TreeRow, type TreeActions } from "@/components/navigation/TreeRow";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
+import { Logo } from "@/components/ui/Logo";
 import { MoveDialog } from "@/components/ui/MoveDialog";
 import { ProfileMenu } from "./ProfileMenu";
 
@@ -141,7 +142,10 @@ export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps
         )}
       >
         <div className="flex h-12 items-center justify-between px-3">
-          <span className="font-serif text-lg font-semibold tracking-tight">NeoNotes</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <Logo size={24} decorative className="shrink-0 ring-1 ring-line" />
+            <span className="truncate font-serif text-lg font-semibold tracking-tight">NeoNotes</span>
+          </div>
           <div className="flex items-center">
             <IconButton
               icon={FilePlus}
