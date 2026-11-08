@@ -51,6 +51,22 @@ body { @apply bg-paper font-sans text-ink antialiased; }
   float: left; height: 0; pointer-events: none; color: var(--muted); opacity: 0.7;
 }
 
+/* Slow blinking cursor on the login page, in the icon's cyan */
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  background: #22d3ee;
+  animation: caret-blink 1.2s steps(1, end) infinite;
+}
+@keyframes caret-blink {
+  0%, 60% { opacity: 1; }
+  61%, 100% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .caret { animation: none; }
   * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
