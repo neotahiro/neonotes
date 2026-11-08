@@ -10,7 +10,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="flex min-h-dvh items-center justify-center px-6">
       <div className="w-full max-w-sm text-center">
-        <h1 className="font-serif text-3xl font-semibold tracking-tight">Noenotes</h1>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight">NeoNotes</h1>
         <p className="mt-2 text-sm text-muted">A quiet place to write.</p>
 
         <form
