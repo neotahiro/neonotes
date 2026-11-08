@@ -1,7 +1,24 @@
 /** The NeoNotes mark: a lowercase "n" whose right leg folds like a page corner. */
-export function Logo({ size = 64, className }: { size?: number; className?: string }) {
+export function Logo({
+  size = 64,
+  className,
+  decorative = false,
+}: {
+  size?: number;
+  className?: string;
+  /** Hide from screen readers when the name "NeoNotes" is written next to it. */
+  decorative?: boolean;
+}) {
   return (
-    <svg viewBox="0 0 512 512" width={size} height={size} role="img" aria-label="NeoNotes" className={className}>
+    <svg
+      viewBox="0 0 512 512"
+      width={size}
+      height={size}
+      {...(decorative ? { "aria-hidden": true } : { role: "img", "aria-label": "NeoNotes" })}
+      // Same corner radius as the tile itself, so rings and shadows follow its shape exactly.
+      style={{ borderRadius: size * (112 / 512) }}
+      className={className}
+    >
       <rect width="512" height="512" rx="112" fill="#0B1220" />
       <g transform="translate(47.9 70.3) scale(0.52)">
         <path
