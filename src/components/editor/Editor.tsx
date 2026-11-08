@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useRef } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -8,13 +9,15 @@ import CharacterCount from "@tiptap/extension-character-count";
 import { Toolbar } from "./Toolbar";
 
 interface EditorProps {
+  /** Each time this number changes, the cursor moves into the text. */
+  focusSignal: number;
   title: string;
   content: string;
   onTitleChange: (title: string) => void;
   onContentChange: (html: string) => void;
 }
 
-export function Editor({ title, content, onTitleChange, onContentChange }: EditorProps) {
+export function Editor({ focusSignal, title, content, onTitleChange, onContentChange }: EditorProps) {
   const editor = useEditor({
     immediatelyRender: false,
     content,
@@ -32,6 +35,14 @@ export function Editor({ title, content, onTitleChange, onContentChange }: Edito
     editorProps: { attributes: { class: "editor-prose", "aria-label": "Document body" } },
     onUpdate: ({ editor: e }) => onContentChange(e.getHTML()),
   });
+
+  const handledSignal = useRef(focusSignal);
+  useEffect(() => {
+    if (editor && focusSignal !== handledSignal.current) {
+      handledSignal.current = focusSignal;
+      editor.commands.focus("start");
+    }
+  }, [editor, focusSignal]);
 
   const words = useEditorState({
     editor,
