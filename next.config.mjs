@@ -28,6 +28,10 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Android looks for this file at a fixed address; the real file lives in public/ (GitHub upload cannot take hidden folders).
+  async rewrites() {
+    return [{ source: "/.well-known/assetlinks.json", destination: "/assetlinks.json" }];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
