@@ -8,8 +8,10 @@ const serif = Literata({ subsets: ["latin"], variable: "--font-serif", display: 
 export const metadata: Metadata = {
   title: "NeoNotes",
   description: "A quiet place to write.",
+  manifest: "/manifest.webmanifest",
+  icons: { icon: "/icons/icon-192.png", apple: "/icons/icon-192.png" },
 };
-export const viewport: Viewport = { width: "device-width", initialScale: 1 };
+export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#0B1220" };
 
 // Runs before paint so the saved theme never flashes.
 const themeScript = `try{var t=localStorage.getItem('noenotes-theme');var d=t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d)}catch(e){}`;
