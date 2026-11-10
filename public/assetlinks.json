@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.neonotes.app",
+      "sha256_cert_fingerprints": ["93:1D:80:31:24:FD:B3:26:12:86:D2:E6:7A:76:BA:CB:DA:F1:2E:16:3D:5E:09:91:AC:AB:2C:53:25:1A:3A:58"]
+    }
+  }
+]
