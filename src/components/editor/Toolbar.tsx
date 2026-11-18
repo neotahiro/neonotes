@@ -3,11 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import {
-  Bold, Heading1, Heading2, Heading3, Italic, Link2, List, ListOrdered,
+  Bold, Heading1, Heading2, Heading3, Italic, Link2, List, ListOrdered, Minus,
   Pilcrow, Quote, Redo2, Strikethrough, Underline, Undo2,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { useModKey } from "@/hooks/useModKey";
+import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 
 /** Returns a safe address, or null if it can't be used. Only http, https and mailto are allowed. */
 function parseUrl(raw: string): string | null {
@@ -21,6 +22,7 @@ const Divider = () => <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-lin
 
 export function Toolbar({ editor }: { editor: Editor }) {
   const mod = useModKey();
+  const keyboard = useKeyboardInset();
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState("");
   const [linkError, setLinkError] = useState("");
@@ -87,29 +89,13 @@ export function Toolbar({ editor }: { editor: Editor }) {
   }, [editor, openLink]);
 
   return (
-    <div className="shrink-0">
-      <div role="toolbar" aria-label="Formatting" className="flex h-11 items-center gap-0.5 overflow-x-auto border-y border-line px-3">
-        <IconButton icon={Undo2} label="Undo" shortcut={`${mod}+Z`} disabled={!s.canUndo} onClick={() => chain().undo().run()} />
-        <IconButton icon={Redo2} label="Redo" shortcut={`${mod}+Shift+Z`} disabled={!s.canRedo} onClick={() => chain().redo().run()} />
-        <Divider />
-        <IconButton icon={Pilcrow} label="Paragraph" shortcut={`${mod}+Alt+0`} active={s.p} onClick={() => chain().setParagraph().run()} />
-        <IconButton icon={Heading1} label="Heading 1" shortcut={`${mod}+Alt+1`} active={s.h1} onClick={() => chain().toggleHeading({ level: 1 }).run()} />
-        <IconButton icon={Heading2} label="Heading 2" shortcut={`${mod}+Alt+2`} active={s.h2} onClick={() => chain().toggleHeading({ level: 2 }).run()} />
-        <IconButton icon={Heading3} label="Heading 3" shortcut={`${mod}+Alt+3`} active={s.h3} onClick={() => chain().toggleHeading({ level: 3 }).run()} />
-        <Divider />
-        <IconButton icon={Bold} label="Bold" shortcut={`${mod}+B`} active={s.bold} onClick={() => chain().toggleBold().run()} />
-        <IconButton icon={Italic} label="Italic" shortcut={`${mod}+I`} active={s.italic} onClick={() => chain().toggleItalic().run()} />
-        <IconButton icon={Underline} label="Underline" shortcut={`${mod}+U`} active={s.underline} onClick={() => chain().toggleUnderline().run()} />
-        <IconButton icon={Strikethrough} label="Strikethrough" shortcut={`${mod}+Shift+S`} active={s.strike} onClick={() => chain().toggleStrike().run()} />
-        <Divider />
-        <IconButton icon={List} label="Bullet list" shortcut={`${mod}+Shift+8`} active={s.bullet} onClick={() => chain().toggleBulletList().run()} />
-        <IconButton icon={ListOrdered} label="Numbered list" shortcut={`${mod}+Shift+7`} active={s.ordered} onClick={() => chain().toggleOrderedList().run()} />
-        <IconButton icon={Quote} label="Blockquote" shortcut={`${mod}+Shift+B`} active={s.quote} onClick={() => chain().toggleBlockquote().run()} />
-        <IconButton icon={Link2} label="Link" shortcut={`${mod}+K`} active={s.link || linkOpen} onClick={openLink} />
-      </div>
-
+    // Floats at the bottom of the writing space. On a phone it is full width and sits above the keyboard.
+    <div
+      className="pointer-events-none absolute inset-x-0 z-10 flex flex-col items-center sm:px-4 sm:pb-4"
+      style={{ bottom: Math.max(0, keyboard - 32) }}
+    >
       {linkOpen && (
-        <div className="border-b border-line bg-sidebar px-3 py-2">
+        <div className="pointer-events-auto w-full border-t border-line bg-sidebar px-3 py-2 sm:mb-2 sm:w-auto sm:min-w-[28rem] sm:max-w-full sm:rounded-xl sm:border sm:shadow-lg">
           {hasTarget ? (
             <form
               className="flex flex-wrap items-center gap-2"
@@ -148,6 +134,32 @@ export function Toolbar({ editor }: { editor: Editor }) {
           {linkError && <p role="alert" className="mt-1.5 text-xs text-red-600 dark:text-red-400">{linkError}</p>}
         </div>
       )}
+      <div
+        role="toolbar"
+        aria-label="Formatting"
+        onMouseDown={(e) => e.preventDefault()}
+        className="pointer-events-auto flex h-11 w-full items-center gap-0.5 overflow-x-auto border-t border-line bg-paper px-3 sm:w-auto sm:max-w-full sm:rounded-xl sm:border sm:bg-paper/95 sm:shadow-lg sm:shadow-black/10 sm:backdrop-blur"
+      >
+        <IconButton icon={Undo2} label="Undo" shortcut={`${mod}+Z`} disabled={!s.canUndo} onClick={() => chain().undo().run()} />
+        <IconButton icon={Redo2} label="Redo" shortcut={`${mod}+Shift+Z`} disabled={!s.canRedo} onClick={() => chain().redo().run()} />
+        <Divider />
+        <IconButton icon={Pilcrow} label="Paragraph" shortcut={`${mod}+Alt+0`} active={s.p} onClick={() => chain().setParagraph().run()} />
+        <IconButton icon={Heading1} label="Heading 1" shortcut={`${mod}+Alt+1`} active={s.h1} onClick={() => chain().toggleHeading({ level: 1 }).run()} />
+        <IconButton icon={Heading2} label="Heading 2" shortcut={`${mod}+Alt+2`} active={s.h2} onClick={() => chain().toggleHeading({ level: 2 }).run()} />
+        <IconButton icon={Heading3} label="Heading 3" shortcut={`${mod}+Alt+3`} active={s.h3} onClick={() => chain().toggleHeading({ level: 3 }).run()} />
+        <Divider />
+        <IconButton icon={Bold} label="Bold" shortcut={`${mod}+B`} active={s.bold} onClick={() => chain().toggleBold().run()} />
+        <IconButton icon={Italic} label="Italic" shortcut={`${mod}+I`} active={s.italic} onClick={() => chain().toggleItalic().run()} />
+        <IconButton icon={Underline} label="Underline" shortcut={`${mod}+U`} active={s.underline} onClick={() => chain().toggleUnderline().run()} />
+        <IconButton icon={Strikethrough} label="Strikethrough" shortcut={`${mod}+Shift+S`} active={s.strike} onClick={() => chain().toggleStrike().run()} />
+        <Divider />
+        <IconButton icon={List} label="Bullet list" shortcut={`${mod}+Shift+8`} active={s.bullet} onClick={() => chain().toggleBulletList().run()} />
+        <IconButton icon={ListOrdered} label="Numbered list" shortcut={`${mod}+Shift+7`} active={s.ordered} onClick={() => chain().toggleOrderedList().run()} />
+        <IconButton icon={Quote} label="Blockquote" shortcut={`${mod}+Shift+B`} active={s.quote} onClick={() => chain().toggleBlockquote().run()} />
+        <IconButton icon={Link2} label="Link" shortcut={`${mod}+K`} active={s.link || linkOpen} onClick={openLink} />
+        <Divider />
+        <IconButton icon={Minus} label="Divider" shortcut="---" onClick={() => chain().setHorizontalRule().run()} />
+      </div>
     </div>
   );
 }

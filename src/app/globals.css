@@ -31,15 +31,15 @@ body { @apply bg-paper font-sans text-ink antialiased; }
 /* Writing surface */
 .editor-prose {
   font-family: var(--font-serif), Georgia, serif;
-  font-size: 1.125rem;
-  line-height: 1.8;
+  font-size: calc(1rem * var(--zoom, 1));
+  line-height: 1.75;
   color: var(--ink);
   outline: none;
 }
 .editor-prose > * + * { margin-top: 1.1em; }
-.editor-prose h1 { font-size: 2rem; line-height: 1.25; font-weight: 600; margin-top: 1.8em; letter-spacing: -0.01em; }
-.editor-prose h2 { font-size: 1.5rem; line-height: 1.3; font-weight: 600; margin-top: 1.6em; }
-.editor-prose h3 { font-size: 1.25rem; line-height: 1.4; font-weight: 600; margin-top: 1.4em; }
+.editor-prose h1 { font-size: 1.9em; line-height: 1.25; font-weight: 600; margin-top: 1.8em; letter-spacing: -0.01em; }
+.editor-prose h2 { font-size: 1.5em; line-height: 1.3; font-weight: 600; margin-top: 1.6em; }
+.editor-prose h3 { font-size: 1.25em; line-height: 1.4; font-weight: 600; margin-top: 1.4em; }
 .editor-prose ul { list-style: disc; padding-left: 1.5em; }
 .editor-prose ol { list-style: decimal; padding-left: 1.5em; }
 .editor-prose li + li { margin-top: 0.3em; }
@@ -50,6 +50,10 @@ body { @apply bg-paper font-sans text-ink antialiased; }
   content: attr(data-placeholder);
   float: left; height: 0; pointer-events: none; color: var(--muted); opacity: 0.7;
 }
+
+.editor-prose hr { border: 0; height: 1px; width: 40%; margin: 2.2em auto; background: var(--muted); opacity: 0.55; cursor: pointer; }
+.editor-prose hr.ProseMirror-selectednode { background: var(--accent); opacity: 1; }
+.note-title { font-size: calc(2rem * var(--zoom, 1)); line-height: 1.25; }
 
 /* Slow blinking cursor on the login page, in the icon's cyan */
 .caret {
