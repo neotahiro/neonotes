@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { PanelLeft, PanelLeftClose } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -15,6 +16,8 @@ interface TopBarProps {
   onRetry: () => void;
   theme: Theme;
   onToggleTheme: () => void;
+  /** The goal, focus and timer buttons. */
+  tools?: ReactNode;
 }
 
 const statusText: Record<SaveStatus, string> = {
@@ -35,10 +38,10 @@ const tone: Record<SaveStatus, string> = {
   error: "text-red-600 dark:text-red-400",
 };
 
-export function TopBar({ sidebarOpen, onToggleSidebar, crumbs, status, onRetry, theme, onToggleTheme }: TopBarProps) {
+export function TopBar({ sidebarOpen, onToggleSidebar, crumbs, status, onRetry, theme, onToggleTheme, tools }: TopBarProps) {
   const mod = useModKey();
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 px-3">
+    <header className="relative flex h-12 shrink-0 items-center gap-2 px-3">
       <IconButton
         icon={sidebarOpen ? PanelLeftClose : PanelLeft}
         label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
@@ -46,6 +49,7 @@ export function TopBar({ sidebarOpen, onToggleSidebar, crumbs, status, onRetry, 
         onClick={onToggleSidebar}
       />
       <p className="min-w-0 flex-1 truncate text-sm text-muted">{crumbs.join(" / ")}</p>
+      {tools}
       {status === "offline" ? (
         <button
           type="button"

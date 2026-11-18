@@ -14,7 +14,10 @@ import TextAlign from "@tiptap/extension-text-align";
 import { FontSize } from "@/lib/editor/fontSizeExtension";
 import { Toolbar } from "./Toolbar";
 import { countWords } from "@/lib/editor/wordCount";
-import { joinSpacing, splitSpacing, type Spacing } from "@/lib/editor/spacing";
+import { joinSettings, splitSettings } from "@/lib/editor/noteSettings";
+import type { Spacing } from "@/lib/editor/spacing";
+import { ActiveBlock } from "@/lib/editor/activeBlock";
+import { GoalMeter } from "@/components/tools/GoalMeter";
 import { useViewSettings, WIDTHS, ZOOMS, type PageWidth, type Zoom } from "@/hooks/useViewSettings";
 import { cn } from "@/lib/utils";
 
@@ -36,13 +39,20 @@ interface EditorProps {
   content: string;
   onTitleChange: (title: string) => void;
   onContentChange: (html: string) => void;
+  /** Focus mode hides everything but the writing. */
+  focusMode?: boolean;
+  /** In focus mode, fade every paragraph except the one you are in. */
+  dimOthers?: boolean;
+  /** Reports the total word count whenever it changes. */
+  onWordCount?: (words: number) => void;
 }
 
-export function Editor({ focusSignal, title, content, onTitleChange, onContentChange }: EditorProps) {
-  // The note's spacing is saved at the start of its text; split it off before the editor sees the text.
-  const [initial] = useState(() => splitSpacing(content));
-  const [spacing, setSpacing] = useState<Spacing>(initial.spacing);
-  const spacingRef = useRef(spacing);
+export function Editor({ focusSignal, title, content, onTitleChange, onContentChange, focusMode = false, dimOthers = false, onWordCount }: EditorProps) {
+  // The note's settings (spacing, word goal) are saved at the start of its text; split them off before the editor sees the text.
+  const [initial] = useState(() => splitSettings(content));
+  const { spacing, goal } = splitSettings(content).settings;
+  const settingsRef = useRef({ spacing, goal });
+  settingsRef.current = { spacing, goal };
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -57,6 +67,7 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
       }),
       Placeholder.configure({ placeholder: "Start writing…" }),
       CharacterCount,
+      ActiveBlock,
       TextStyle,
       FontFamily,
       FontSize,
@@ -65,13 +76,11 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
     editorProps: { attributes: { class: "editor-prose", "aria-label": "Document body" } },
-    onUpdate: ({ editor: e }) => onContentChange(joinSpacing(e.getHTML(), spacingRef.current)),
+    onUpdate: ({ editor: e }) => onContentChange(joinSettings(e.getHTML(), settingsRef.current)),
   });
 
   const changeSpacing = (next: Spacing) => {
-    spacingRef.current = next;
-    setSpacing(next);
-    if (editor) onContentChange(joinSpacing(editor.getHTML(), next));
+    if (editor) onContentChange(joinSettings(editor.getHTML(), { ...settingsRef.current, spacing: next }));
   };
 
   const handledSignal = useRef(focusSignal);
@@ -97,8 +106,12 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
   });
   const { total, selected } = counts ?? { total: 0, selected: 0 };
 
+  useEffect(() => {
+    onWordCount?.(total);
+  }, [total, onWordCount]);
+
   return (
-    <main className="flex min-h-0 flex-1 flex-col">
+    <main className={cn("flex min-h-0 flex-1 flex-col", focusMode && dimOthers && "focus-dim")}>
       <div className="relative min-h-0 flex-1">
         <div className="h-full overflow-y-auto" style={{
             "--zoom": view.zoom / 100,
@@ -120,8 +133,9 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
             <EditorContent editor={editor} />
           </div>
         </div>
-        {editor && <Toolbar editor={editor} spacing={spacing} onSpacingChange={changeSpacing} />}
+        {editor && !focusMode && <Toolbar editor={editor} spacing={spacing} onSpacingChange={changeSpacing} />}
       </div>
+      {!focusMode && (
       <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-line px-4 text-xs text-muted">
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5">
@@ -145,10 +159,15 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
             </select>
           </label>
         </div>
-        <span>
-          {selected > 0 ? `${selected} of ${total}` : total} {total === 1 ? "word" : "words"} · {Math.max(1, Math.round(total / 230))} min read
-        </span>
+        <div className="flex items-center gap-3">
+          {goal !== null && <GoalMeter words={total} goal={goal} />}
+          <span>
+            {selected > 0 ? `${selected} of ${total}` : total} {total === 1 ? "word" : "words"}
+            <span className="hidden sm:inline"> · {Math.max(1, Math.round(total / 230))} min read</span>
+          </span>
+        </div>
       </footer>
+      )}
     </main>
   );
 }

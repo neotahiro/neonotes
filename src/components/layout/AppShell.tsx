@@ -1,19 +1,46 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { FilePlus } from "lucide-react";
 import type { UserInfo } from "@/lib/types";
 import { useTheme } from "@/hooks/useTheme";
 import { useWorkspace } from "@/hooks/useWorkspace";
+import { useTimer } from "@/hooks/useTimer";
+import { splitSettings, updateSettings } from "@/lib/editor/noteSettings";
+import { FocusBar } from "@/components/tools/FocusBar";
+import { TimerDoneDialog } from "@/components/tools/TimerDoneDialog";
 import { Editor } from "@/components/editor/Editor";
 import { NoticeBar } from "./NoticeBar";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { TopTools } from "./TopTools";
+
+const DIM_KEY = "noenotes-focus-dim";
 
 export function AppShell({ user }: { user: UserInfo }) {
   const ws = useWorkspace();
   const { theme, toggle } = useTheme();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [focusSignal, setFocusSignal] = useState(0);
+  const [focus, setFocus] = useState(false);
+  const [dimOthers, setDimOthers] = useState(false);
+  const [words, setWords] = useState(0);
+  const timer = useTimer();
+
+  useEffect(() => {
+    try { setDimOthers(localStorage.getItem(DIM_KEY) === "1"); } catch { /* storage unavailable */ }
+  }, []);
+  const changeDim = useCallback((dim: boolean) => {
+    setDimOthers(dim);
+    try { localStorage.setItem(DIM_KEY, dim ? "1" : "0"); } catch { /* storage unavailable */ }
+  }, []);
+
+  // Esc leaves focus mode.
+  useEffect(() => {
+    if (!focus) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setFocus(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [focus]);
 
   useEffect(() => {
     if (window.matchMedia("(max-width: 767px)").matches) setSidebarOpen(false);
@@ -34,20 +61,43 @@ export function AppShell({ user }: { user: UserInfo }) {
   const active = ws.nodes.find((n) => n.id === ws.activeId && n.kind === "doc") ?? null;
   const parent = active ? ws.nodes.find((n) => n.id === active.parentId) : null;
   const crumbs = active ? [...(parent ? [parent.name] : []), active.name || "Untitled"] : [];
+  const goal = active ? splitSettings(active.content).settings.goal : null;
+  const changeGoal = (next: number | null) => {
+    if (active) ws.setContent(active.id, updateSettings(active.content, { goal: next }));
+  };
+
+  // Focus mode only makes sense with a note open.
+  useEffect(() => {
+    if (!active) setFocus(false);
+  }, [active]);
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} ws={ws} user={user} onFocusEditor={() => setFocusSignal((n) => n + 1)} />
+      <Sidebar open={sidebarOpen && !focus} onClose={() => setSidebarOpen(false)} ws={ws} user={user} onFocusEditor={() => setFocusSignal((n) => n + 1)} />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          sidebarOpen={sidebarOpen}
-          onToggleSidebar={() => setSidebarOpen((o) => !o)}
-          crumbs={crumbs}
-          status={ws.status}
-          onRetry={ws.syncNow}
-          theme={theme}
-          onToggleTheme={toggle}
-        />
+        {!focus && (
+          <TopBar
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={() => setSidebarOpen((o) => !o)}
+            crumbs={crumbs}
+            status={ws.status}
+            onRetry={ws.syncNow}
+            theme={theme}
+            onToggleTheme={toggle}
+            tools={
+              <TopTools
+                hasNote={active !== null}
+                goal={goal}
+                words={words}
+                onGoalChange={changeGoal}
+                dim={dimOthers}
+                onDimChange={changeDim}
+                onStartFocus={() => setFocus(true)}
+                timer={timer}
+              />
+            }
+          />
+        )}
         {ws.notice && <NoticeBar message={ws.notice} onDismiss={ws.dismissNotice} />}
         {!ws.ready ? (
           <main className="flex-1" aria-busy="true" />
@@ -59,6 +109,9 @@ export function AppShell({ user }: { user: UserInfo }) {
             content={active.content}
             onTitleChange={(name) => ws.rename(active.id, name)}
             onContentChange={(html) => ws.setContent(active.id, html)}
+            focusMode={focus}
+            dimOthers={dimOthers}
+            onWordCount={setWords}
           />
         ) : (
           <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
@@ -74,6 +127,8 @@ export function AppShell({ user }: { user: UserInfo }) {
           </main>
         )}
       </div>
+      {focus && <FocusBar onExit={() => setFocus(false)} timer={timer} goal={goal} words={words} />}
+      <TimerDoneDialog timer={timer} />
     </div>
   );
 }

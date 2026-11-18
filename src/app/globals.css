@@ -52,6 +52,10 @@ body { @apply bg-paper font-sans text-ink antialiased; }
   float: left; height: 0; pointer-events: none; color: var(--muted); opacity: 0.7;
 }
 
+/* Focus mode: everything except the paragraph you are in fades back. */
+.editor-prose > * { transition: opacity 0.2s; }
+.focus-dim .editor-prose > *:not(.is-active-block) { opacity: 0.3; }
+
 /* Text on a highlight stays dark so it is readable in both themes. */
 .editor-prose mark { color: #1d2530 !important; border-radius: 2px; padding: 0.05em 0.1em; }
 .editor-prose hr { border: 0; height: 1px; width: 40%; margin: 2.2em auto; background: var(--muted); opacity: 0.55; cursor: pointer; }

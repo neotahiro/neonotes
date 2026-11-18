@@ -24,28 +24,3 @@ export function stepValue(list: number[], current: number, direction: 1 | -1): n
   if (i === -1) return direction === 1 ? (list.find((v) => v > current) ?? current) : ([...list].reverse().find((v) => v < current) ?? current);
   return list[Math.min(list.length - 1, Math.max(0, i + direction))];
 }
-
-const MARKER = /^\s*<!--neonotes:(\{[^}]*\})-->/;
-
-/** Separates a saved note into its text (HTML) and its spacing. Unknown or missing values fall back to the defaults. */
-export function splitSpacing(stored: string): { html: string; spacing: Spacing } {
-  const match = MARKER.exec(stored);
-  if (!match) return { html: stored, spacing: DEFAULT_SPACING };
-  let raw: Record<string, unknown> = {};
-  try { raw = JSON.parse(match[1]) as Record<string, unknown>; } catch { /* use the defaults */ }
-  const pick = (value: unknown, list: number[], fallback: number) => (typeof value === "number" && list.includes(value) ? value : fallback);
-  return {
-    html: stored.slice(match[0].length),
-    spacing: {
-      lineHeight: pick(raw.lh, LINE_HEIGHTS, DEFAULT_SPACING.lineHeight),
-      paragraph: pick(raw.ps, PARAGRAPH_GAPS, DEFAULT_SPACING.paragraph),
-      word: pick(raw.ws, WORD_GAPS, DEFAULT_SPACING.word),
-    },
-  };
-}
-
-/** Puts the spacing back in front of the note's HTML. Notes with the default spacing carry no marker at all. */
-export function joinSpacing(html: string, spacing: Spacing): string {
-  if (isDefaultSpacing(spacing)) return html;
-  return `<!--neonotes:${JSON.stringify({ lh: spacing.lineHeight, ps: spacing.paragraph, ws: spacing.word })}-->${html}`;
-}
