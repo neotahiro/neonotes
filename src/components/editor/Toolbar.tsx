@@ -1,9 +1,9 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import {
-  AlignVerticalSpaceAround, Bold, Heading1, Heading2, Heading3, Italic, Link2, List, ListOrdered, Minus,
+  AlignVerticalSpaceAround, Bold, Heading1, ListChecks, Table as TableIcon, type LucideIcon, Heading2, Heading3, Italic, Link2, List, ListOrdered, Minus,
   Pilcrow, Quote, Redo2, Strikethrough, Type, Underline, Undo2,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
@@ -23,19 +23,31 @@ function parseUrl(raw: string): string | null {
 
 const Divider = () => <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-line" />;
 
+/** Extra buttons (and the panel they open) supplied by the editor, such as "Link to note". */
+export interface ToolbarExtra {
+  buttons: { id: string; icon: LucideIcon; label: string; shortcut?: string; active: boolean; onClick: () => void }[];
+  panel: ReactNode;
+  onClose: () => void;
+}
+
+const tableButton = "h-7 shrink-0 rounded-md px-2 text-xs transition-colors hover:bg-hover";
+
 interface ToolbarProps {
   editor: Editor;
+  extra?: ToolbarExtra;
   spacing: Spacing;
   onSpacingChange: (next: Spacing) => void;
 }
 
-export function Toolbar({ editor, spacing, onSpacingChange }: ToolbarProps) {
+export function Toolbar({ editor, extra, spacing, onSpacingChange }: ToolbarProps) {
   const mod = useModKey();
   const keyboard = useKeyboardInset();
   const [linkOpen, setLinkOpen] = useState(false);
   const [styleOpen, setStyleOpen] = useState(false);
   const [spacingOpen, setSpacingOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const extraRef = useRef(extra);
+  extraRef.current = extra;
   const [linkValue, setLinkValue] = useState("");
   const [linkError, setLinkError] = useState("");
   const [hasTarget, setHasTarget] = useState(true);
@@ -57,6 +69,8 @@ export function Toolbar({ editor, spacing, onSpacingChange }: ToolbarProps) {
       ordered: e?.isActive("orderedList") ?? false,
       quote: e?.isActive("blockquote") ?? false,
       link: e?.isActive("link") ?? false,
+      task: e?.isActive("taskList") ?? false,
+      inTable: e?.isActive("table") ?? false,
     }),
   });
   const chain = () => editor.chain().focus();
@@ -68,6 +82,7 @@ export function Toolbar({ editor, spacing, onSpacingChange }: ToolbarProps) {
     setHasTarget(!editor.state.selection.empty || editor.isActive("link"));
     setStyleOpen(false);
     setSpacingOpen(false);
+    extraRef.current?.onClose();
     setLinkOpen(true);
   }, [editor]);
 
@@ -103,10 +118,10 @@ export function Toolbar({ editor, spacing, onSpacingChange }: ToolbarProps) {
   }, [editor, openLink]);
 
   // The style and spacing panels close when you click or tap anywhere outside them, or press Escape.
-  const panelOpen = styleOpen || spacingOpen;
+  const panelOpen = styleOpen || spacingOpen || Boolean(extra?.panel);
   useEffect(() => {
     if (!panelOpen) return;
-    const close = () => { setStyleOpen(false); setSpacingOpen(false); };
+    const close = () => { setStyleOpen(false); setSpacingOpen(false); extraRef.current?.onClose(); };
     const onPointerDown = (e: PointerEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) close();
     };
@@ -121,6 +136,7 @@ export function Toolbar({ editor, spacing, onSpacingChange }: ToolbarProps) {
 
   const togglePanel = (which: "style" | "spacing") => {
     setLinkOpen(false);
+    extraRef.current?.onClose();
     setStyleOpen(which === "style" ? (o) => !o : false);
     setSpacingOpen(which === "spacing" ? (o) => !o : false);
   };
@@ -132,6 +148,30 @@ export function Toolbar({ editor, spacing, onSpacingChange }: ToolbarProps) {
       className="pointer-events-none absolute inset-x-0 z-10 flex flex-col items-center sm:px-4 sm:pb-4"
       style={{ bottom: Math.max(0, keyboard - 32) }}
     >
+      {s.inTable && (
+        <div
+          role="toolbar"
+          aria-label="Table"
+          onMouseDown={(e) => e.preventDefault()}
+          className="pointer-events-auto mb-0 flex w-full items-center gap-0.5 overflow-x-auto border-t border-line bg-sidebar px-3 py-1.5 sm:mb-2 sm:w-auto sm:max-w-full sm:rounded-xl sm:border sm:shadow-lg"
+        >
+          <span className="shrink-0 pr-1 text-xs text-muted">Table</span>
+          <button type="button" className={tableButton} onClick={() => chain().addRowBefore().run()}>Row above</button>
+          <button type="button" className={tableButton} onClick={() => chain().addRowAfter().run()}>Row below</button>
+          <button type="button" className={tableButton} onClick={() => chain().addColumnBefore().run()}>Column left</button>
+          <button type="button" className={tableButton} onClick={() => chain().addColumnAfter().run()}>Column right</button>
+          <Divider />
+          <button type="button" className={tableButton} onClick={() => chain().toggleHeaderRow().run()}>Header row</button>
+          <button type="button" className={tableButton} onClick={() => chain().deleteRow().run()}>Delete row</button>
+          <button type="button" className={tableButton} onClick={() => chain().deleteColumn().run()}>Delete column</button>
+          <button type="button" className={`${tableButton} text-red-600 dark:text-red-400`} onClick={() => chain().deleteTable().run()}>Delete table</button>
+        </div>
+      )}
+      {extra?.panel && (
+        <div className="pointer-events-auto max-h-[45vh] w-full overflow-y-auto border-t border-line bg-sidebar px-3 py-3 sm:mb-2 sm:w-[26rem] sm:max-w-full sm:rounded-xl sm:border sm:shadow-lg">
+          {extra.panel}
+        </div>
+      )}
       {styleOpen && (
         <div
           onMouseDown={(e) => e.preventDefault()}
@@ -211,8 +251,20 @@ export function Toolbar({ editor, spacing, onSpacingChange }: ToolbarProps) {
         <IconButton icon={AlignVerticalSpaceAround} label="Spacing" active={spacingOpen} onClick={() => togglePanel("spacing")} />
         <IconButton icon={List} label="Bullet list" shortcut={`${mod}+Shift+8`} active={s.bullet} onClick={() => chain().toggleBulletList().run()} />
         <IconButton icon={ListOrdered} label="Numbered list" shortcut={`${mod}+Shift+7`} active={s.ordered} onClick={() => chain().toggleOrderedList().run()} />
+        <IconButton icon={ListChecks} label="Checklist" shortcut={`${mod}+Shift+9`} active={s.task} onClick={() => chain().toggleTaskList().run()} />
         <IconButton icon={Quote} label="Blockquote" shortcut={`${mod}+Shift+B`} active={s.quote} onClick={() => chain().toggleBlockquote().run()} />
+        <IconButton icon={TableIcon} label="Table" active={s.inTable} onClick={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} />
         <IconButton icon={Link2} label="Link" shortcut={`${mod}+K`} active={s.link || linkOpen} onClick={openLink} />
+        {extra?.buttons.map((b) => (
+          <IconButton
+            key={b.id}
+            icon={b.icon}
+            label={b.label}
+            shortcut={b.shortcut}
+            active={b.active}
+            onClick={() => { setLinkOpen(false); setStyleOpen(false); setSpacingOpen(false); b.onClick(); }}
+          />
+        ))}
         <Divider />
         <IconButton icon={Minus} label="Divider" shortcut="---" onClick={() => chain().setHorizontalRule().run()} />
       </div>

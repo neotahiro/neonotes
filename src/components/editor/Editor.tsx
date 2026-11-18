@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { FileSymlink } from "lucide-react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -11,7 +12,18 @@ import FontFamily from "@tiptap/extension-font-family";
 import Color from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
 import TextAlign from "@tiptap/extension-text-align";
+import Table from "@tiptap/extension-table";
+import TableRow from "@tiptap/extension-table-row";
+import TableHeader from "@tiptap/extension-table-header";
+import TableCell from "@tiptap/extension-table-cell";
+import TaskList from "@tiptap/extension-task-list";
+import TaskItem from "@tiptap/extension-task-item";
 import { FontSize } from "@/lib/editor/fontSizeExtension";
+import { NoteLink } from "@/lib/editor/noteLinkExtension";
+import { NoteLinkSuggestion, type NoteLinkSuggestState } from "@/lib/editor/noteLinkSuggestion";
+import { syncNoteLinkLabels, type NoteRef } from "@/lib/editor/noteLinks";
+import { NoteLinkMenu } from "./NoteLinkMenu";
+import { NoteLinkPicker } from "./NoteLinkPicker";
 import { Toolbar } from "./Toolbar";
 import { countWords } from "@/lib/editor/wordCount";
 import { joinSettings, splitSettings } from "@/lib/editor/noteSettings";
@@ -45,14 +57,31 @@ interface EditorProps {
   dimOthers?: boolean;
   /** Reports the total word count whenever it changes. */
   onWordCount?: (words: number) => void;
+  /** Every note, so this one can link to them. */
+  notes?: NoteRef[];
+  /** The id of the note being edited. */
+  currentId?: string;
+  /** Called when a link to another note is clicked. */
+  onOpenNote?: (id: string) => void;
 }
 
-export function Editor({ focusSignal, title, content, onTitleChange, onContentChange, focusMode = false, dimOthers = false, onWordCount }: EditorProps) {
+export function Editor({ focusSignal, title, content, onTitleChange, onContentChange, focusMode = false, dimOthers = false, onWordCount, notes = [], currentId, onOpenNote }: EditorProps) {
   // The note's settings (spacing, word goal) are saved at the start of its text; split them off before the editor sees the text.
   const [initial] = useState(() => splitSettings(content));
   const { spacing, goal } = splitSettings(content).settings;
   const settingsRef = useRef({ spacing, goal });
   settingsRef.current = { spacing, goal };
+
+  // Links between notes: the "[[" menu, the toolbar panel, and keeping link titles current.
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const openRef = useRef(onOpenNote);
+  openRef.current = onOpenNote;
+  const keyHandler = useRef<((e: KeyboardEvent) => boolean) | null>(null);
+  const registerKeys = useCallback((handler: ((e: KeyboardEvent) => boolean) | null) => { keyHandler.current = handler; }, []);
+  const [suggest, setSuggest] = useState<NoteLinkSuggestState | null>(null);
+  const [suggestDismissed, setSuggestDismissed] = useState(false);
+  const [panel, setPanel] = useState<"notelink" | null>(null);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -68,6 +97,20 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
       Placeholder.configure({ placeholder: "Start writing…" }),
       CharacterCount,
       ActiveBlock,
+      Table.configure({ resizable: false }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      NoteLink,
+      NoteLinkSuggestion.configure({
+        onChange: (state) => {
+          setSuggest(state);
+          if (!state) setSuggestDismissed(false);
+        },
+        onKey: (event) => keyHandler.current?.(event) ?? false,
+      }),
       TextStyle,
       FontFamily,
       FontSize,
@@ -75,7 +118,19 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
-    editorProps: { attributes: { class: "editor-prose", "aria-label": "Document body" } },
+    editorProps: {
+      attributes: { class: "editor-prose", "aria-label": "Document body" },
+      handleDOMEvents: {
+        // Clicking a link to another note opens that note.
+        click: (_view, event) => {
+          const link = (event.target as HTMLElement).closest?.("[data-note-link]");
+          if (!link) return false;
+          const id = link.getAttribute("data-note-link");
+          if (id && !link.hasAttribute("data-missing")) openRef.current?.(id);
+          return true;
+        },
+      },
+    },
     onUpdate: ({ editor: e }) => onContentChange(joinSettings(e.getHTML(), settingsRef.current)),
   });
 
@@ -106,6 +161,12 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
   });
   const { total, selected } = counts ?? { total: 0, selected: 0 };
 
+  // Make links show their note's current title (this is what lets them survive renames).
+  const noteKey = notes.map((n) => `${n.id}:${n.name}`).join("|");
+  useEffect(() => {
+    if (editor) syncNoteLinkLabels(editor, notesRef.current);
+  }, [editor, noteKey]);
+
   useEffect(() => {
     onWordCount?.(total);
   }, [total, onWordCount]);
@@ -133,8 +194,39 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
             <EditorContent editor={editor} />
           </div>
         </div>
-        {editor && !focusMode && <Toolbar editor={editor} spacing={spacing} onSpacingChange={changeSpacing} />}
+        {editor && !focusMode && (
+          <Toolbar
+            editor={editor}
+            spacing={spacing}
+            onSpacingChange={changeSpacing}
+            extra={{
+              buttons: [
+                {
+                  id: "notelink",
+                  icon: FileSymlink,
+                  label: "Link to note",
+                  shortcut: "[[",
+                  active: panel === "notelink",
+                  onClick: () => setPanel((p) => (p === "notelink" ? null : "notelink")),
+                },
+              ],
+              panel: panel === "notelink" ? (
+                <NoteLinkPicker editor={editor} notes={notes} currentId={currentId ?? null} onDone={() => setPanel(null)} />
+              ) : null,
+              onClose: () => setPanel(null),
+            }}
+          />
+        )}
       </div>
+      {suggest && !suggestDismissed && (
+        <NoteLinkMenu
+          state={suggest}
+          notes={notes}
+          currentId={currentId ?? null}
+          registerKeys={registerKeys}
+          onDismiss={() => setSuggestDismissed(true)}
+        />
+      )}
       {!focusMode && (
       <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-line px-4 text-xs text-muted">
         <div className="flex items-center gap-3">

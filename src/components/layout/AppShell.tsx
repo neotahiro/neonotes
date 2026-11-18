@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { FilePlus } from "lucide-react";
 import type { UserInfo } from "@/lib/types";
 import { useTheme } from "@/hooks/useTheme";
@@ -61,6 +61,20 @@ export function AppShell({ user }: { user: UserInfo }) {
   const active = ws.nodes.find((n) => n.id === ws.activeId && n.kind === "doc") ?? null;
   const parent = active ? ws.nodes.find((n) => n.id === active.parentId) : null;
   const crumbs = active ? [...(parent ? [parent.name] : []), active.name || "Untitled"] : [];
+  // Every note, for linking between notes. Each shows the folders it sits in.
+  const noteRefs = useMemo(() => {
+    const byId = new Map(ws.nodes.map((n) => [n.id, n]));
+    return ws.nodes
+      .filter((n) => n.kind === "doc")
+      .map((n) => {
+        const folders: string[] = [];
+        for (let p = n.parentId ? byId.get(n.parentId) : undefined; p && folders.length < 5; p = p.parentId ? byId.get(p.parentId) : undefined) {
+          folders.unshift(p.name || "Untitled");
+        }
+        return { id: n.id, name: n.name || "Untitled", path: folders.join(" / ") };
+      });
+  }, [ws.nodes]);
+
   const goal = active ? splitSettings(active.content).settings.goal : null;
   const changeGoal = (next: number | null) => {
     if (active) ws.setContent(active.id, updateSettings(active.content, { goal: next }));
@@ -112,6 +126,9 @@ export function AppShell({ user }: { user: UserInfo }) {
             focusMode={focus}
             dimOthers={dimOthers}
             onWordCount={setWords}
+            notes={noteRefs}
+            currentId={active.id}
+            onOpenNote={ws.select}
           />
         ) : (
           <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
