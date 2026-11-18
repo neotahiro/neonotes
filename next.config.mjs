@@ -33,7 +33,11 @@ const nextConfig = {
     return [{ source: "/.well-known/assetlinks.json", destination: "/assetlinks.json" }];
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The browser must always check for a newer offline worker.
+      { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache" }] },
+    ];
   },
 };
 export default nextConfig;

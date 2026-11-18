@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { ChevronsUpDown, LogOut } from "lucide-react";
 import { signOutAction } from "@/app/actions";
+import { clearOfflinePages } from "@/lib/offline";
 import type { UserInfo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +51,7 @@ export function ProfileMenu({ user }: { user: UserInfo }) {
           >
             {driveText[drive]}
           </p>
-          <form action={signOutAction}>
+          <form action={signOutAction} onSubmit={clearOfflinePages}>
             <button
               type="submit"
               className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-hover"
