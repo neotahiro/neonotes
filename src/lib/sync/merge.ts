@@ -20,6 +20,8 @@ export interface PullPlan {
   conflicts: { id: string }[];
   /** Unsaved local changes where Drive moved on only because of our own earlier save: just note the new time. */
   adopt: { id: string; modified: string }[];
+  /** Notes we already have whose original id (made on another device) should be remembered. */
+  aliases: { id: string; localId: string }[];
 }
 
 /**
@@ -37,18 +39,37 @@ export function planPull(
   const localByDrive = new Map<string, WorkspaceNode>();
   for (const n of local) if (n.sync) localByDrive.set(n.sync.driveId, n);
 
-  const plan: PullPlan = { items: [], removeIds: [], dropSync: [], conflicts: [], adopt: [] };
+  const plan: PullPlan = { items: [], removeIds: [], dropSync: [], conflicts: [], adopt: [], aliases: [] };
 
   for (const n of local) {
     if (n.sync && !remoteIds.has(n.sync.driveId)) (isDirty(n) ? plan.dropSync : plan.removeIds).push(n.id);
   }
 
+  // Decide the local id of every remote note first, so children can point at their parents.
+  // A note we haven't seen before gets the id it was created with (the same on every device); otherwise its Drive id.
+  const usedIds = new Set(local.map((n) => n.id));
+  const assigned = new Map<string, string>();
+  for (const r of remote) {
+    if (pending.has(r.id)) continue;
+    const existing = localByDrive.get(r.id);
+    if (existing) {
+      assigned.set(r.id, existing.id);
+      continue;
+    }
+    const chosen = r.localId && !usedIds.has(r.localId) ? r.localId : r.id;
+    usedIds.add(chosen);
+    assigned.set(r.id, chosen);
+  }
+
   for (const r of remote) {
     if (pending.has(r.id)) continue; // we're about to trash it
-    const parentLocal = r.parentId && remoteIds.has(r.parentId) ? (localByDrive.get(r.parentId)?.id ?? r.parentId) : null;
+    const parentLocal = r.parentId && remoteIds.has(r.parentId) ? (assigned.get(r.parentId) ?? null) : null;
     const existing = localByDrive.get(r.id);
 
     if (existing) {
+      if (!existing.sync!.localId && r.localId && r.localId !== existing.id) {
+        plan.aliases.push({ id: existing.id, localId: r.localId });
+      }
       if (existing.sync!.modified === r.modified) continue;
       if (isDirty(existing)) {
         if (deviceId && r.writer === deviceId) plan.adopt.push({ id: existing.id, modified: r.modified });
@@ -58,11 +79,12 @@ export function planPull(
     }
 
     const version = Date.parse(r.modified);
+    const localId = existing?.sync?.localId ?? (r.localId && r.localId !== assigned.get(r.id) ? r.localId : undefined);
     plan.items.push({
       refresh: !!existing,
       needsContent: r.kind === "doc",
       node: {
-        id: existing?.id ?? r.id,
+        id: assigned.get(r.id)!,
         kind: r.kind,
         name: r.name,
         parentId: parentLocal,
@@ -70,7 +92,7 @@ export function planPull(
         content: existing?.content ?? "",
         createdAt: r.createdAt,
         updatedAt: version,
-        sync: { driveId: r.id, version, parentId: parentLocal, modified: r.modified },
+        sync: { driveId: r.id, version, parentId: parentLocal, modified: r.modified, ...(localId ? { localId } : {}) },
       },
     });
   }
@@ -101,6 +123,11 @@ export function applyPlan(
       out = out.map((n) => (n.id === node.id ? node : n));
       refreshed.push(node.id);
     }
+  }
+
+  if (plan.aliases.length) {
+    const alias = new Map(plan.aliases.map((a) => [a.id, a.localId]));
+    out = out.map((n) => (n.sync && !n.sync.localId && alias.has(n.id) ? { ...n, sync: { ...n.sync, localId: alias.get(n.id)! } } : n));
   }
 
   // If something's parent no longer exists, show it at the top level rather than losing it.

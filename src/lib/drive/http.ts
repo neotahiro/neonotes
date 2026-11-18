@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { CreateBody, UpdateBody } from "@/lib/types";
 import { DriveAuthError, getDriveAccess } from "./access";
-import { ConflictError, DriveError, ensureRootFolder } from "./drive";
+import { ConflictError, DriveError, NotAllowedError, ensureRootFolder } from "./drive";
 
 const noStore = { "Cache-Control": "no-store" };
 const MAX_CONTENT = 3_000_000; // characters; Vercel rejects request bodies over ~4.5 MB
@@ -38,6 +38,7 @@ export async function withDrive(
   } catch (err) {
     if (err instanceof DriveAuthError) return json({ reason: err.reason }, 401);
     if (err instanceof ConflictError) return json({ conflict: true }, 409);
+    if (err instanceof NotAllowedError) return json({ error: err.message }, 403);
     if (err instanceof DriveError && err.status === 404) return json({ error: "Not found" }, 404);
     console.error("Drive route failed:", err);
     return json({ error: "Drive request failed" }, 502);
@@ -104,4 +105,15 @@ export function parseUpdate(b: unknown): UpdateBody | null {
     out.trashed = true;
   }
   return out;
+}
+
+export type TrashAction = { action: "restore" | "delete"; id: string } | { action: "empty" };
+
+export function parseTrashAction(b: unknown): TrashAction | null {
+  if (!isRecord(b)) return null;
+  if (b.action === "empty") return { action: "empty" };
+  if ((b.action === "restore" || b.action === "delete") && typeof b.id === "string" && ID_RE.test(b.id)) {
+    return { action: b.action, id: b.id };
+  }
+  return null;
 }

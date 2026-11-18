@@ -2,7 +2,8 @@
  * Server-only Google Drive helpers. With the drive.file permission, Drive only
  * ever shows this app the files it created itself.
  */
-import type { CreateBody, RemoteFile, RemoteNode, RemoteResult, UpdateBody } from "@/lib/types";
+import type { CreateBody, RemoteFile, RemoteNode, RemoteResult, TrashItem, UpdateBody } from "@/lib/types";
+import { deletedTogether } from "@/lib/trash";
 
 const API = "https://www.googleapis.com/drive/v3";
 const UPLOAD = "https://www.googleapis.com/upload/drive/v3";
@@ -15,6 +16,13 @@ export const ROOT_FOLDER_NAME = "Noenotes";
 export class ConflictError extends Error {
   constructor() {
     super("conflict");
+  }
+}
+
+/** The request asked for something the app doesn't allow, such as deleting a note that isn't in the trash. */
+export class NotAllowedError extends Error {
+  constructor(message: string) {
+    super(message);
   }
 }
 
@@ -60,6 +68,9 @@ interface DriveFile {
   modifiedTime: string;
   appProperties?: Record<string, string>;
 }
+
+const ID_RE = /^[A-Za-z0-9_-]{1,100}$/;
+const validId = (v: string | undefined) => (v && ID_RE.test(v) ? v : undefined);
 
 const rootCache = new Map<string, string>();
 
@@ -107,6 +118,7 @@ export async function listNodes(token: string, rootId: string): Promise<RemoteNo
         createdAt: Number(f.appProperties?.createdAt) || Date.parse(f.modifiedTime),
         modified: f.modifiedTime,
         writer: f.appProperties?.writer,
+        localId: validId(f.appProperties?.localId),
       });
     }
     pageToken = page.nextPageToken;
@@ -204,4 +216,98 @@ export async function createNode(token: string, rootId: string, input: CreateBod
       ? await driveRequest<DriveFile>(token, "/files?fields=id,modifiedTime", { method: "POST", body: JSON.stringify(metadata) })
       : await upload<DriveFile>(token, "/files?uploadType=multipart&fields=id,modifiedTime", "POST", metadata, input.content);
   return { id: file.id, modified: file.modifiedTime };
+}
+
+/** A note or folder in the Drive trash, with what is needed to put it back. */
+interface TrashedNode extends TrashItem {
+  /** Drive ids of its parents. */
+  parents: string[];
+  parentId: string | null;
+}
+
+/** Everything the app has put in the Drive trash (including notes deleted before the app had a Trash view). */
+export async function listTrashed(token: string): Promise<TrashedNode[]> {
+  const out: TrashedNode[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      q: "trashed=true and appProperties has { key='noenotes' and value='node' }",
+      fields: "nextPageToken,files(id,name,mimeType,parents,modifiedTime,trashedTime)",
+      pageSize: "1000",
+      spaces: "drive",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const page = await driveRequest<{ files: (DriveFile & { trashedTime?: string })[]; nextPageToken?: string }>(token, `/files?${params}`);
+    for (const f of page.files) {
+      out.push({
+        id: f.id,
+        kind: f.mimeType === FOLDER_MIME ? "folder" : "doc",
+        name: f.name,
+        trashedAt: Date.parse(f.trashedTime ?? f.modifiedTime) || 0,
+        parents: f.parents ?? [],
+        parentId: f.parents?.[0] ?? null,
+      });
+    }
+    pageToken = page.nextPageToken;
+  } while (pageToken);
+  return out.sort((a, b) => b.trashedAt - a.trashedAt);
+}
+
+async function untrash(token: string, id: string, move?: { to: string; from: string[] }): Promise<void> {
+  const params = new URLSearchParams({ fields: "id" });
+  if (move) {
+    params.set("addParents", move.to);
+    if (move.from.length) params.set("removeParents", move.from.join(","));
+  }
+  await driveRequest(token, `/files/${id}?${params}`, { method: "PATCH", body: JSON.stringify({ trashed: false }) });
+}
+
+/**
+ * Puts a note or folder back. A folder comes back with what was deleted along with it. If the folder it used
+ * to be in is still deleted (or gone), it is put at the top level instead.
+ */
+export async function restoreFromTrash(token: string, rootId: string, id: string): Promise<{ restored: number; movedToTop: boolean }> {
+  const all = await listTrashed(token);
+  const target = all.find((t) => t.id === id);
+  if (!target) throw new DriveError(404, "Not in the trash");
+
+  let movedToTop = false;
+  if (target.parentId && target.parentId !== rootId) {
+    if (all.some((t) => t.id === target.parentId)) {
+      movedToTop = true;
+    } else {
+      try {
+        const parent = await driveRequest<{ trashed?: boolean }>(token, `/files/${target.parentId}?fields=id,trashed`);
+        movedToTop = Boolean(parent.trashed);
+      } catch (err) {
+        if (err instanceof DriveError && err.status === 404) movedToTop = true;
+        else throw err;
+      }
+    }
+  }
+  await untrash(token, id, movedToTop ? { to: rootId, from: target.parents } : undefined);
+
+  const inside = target.kind === "folder" ? deletedTogether(all, id) : [];
+  for (const child of inside) await untrash(token, child.id);
+  return { restored: 1 + inside.length, movedToTop };
+}
+
+/** Permanently removes something that is in the trash. Refuses anything that isn't, so a live note can never be lost this way. */
+export async function deleteForever(token: string, id: string): Promise<void> {
+  const meta = await driveRequest<{ trashed?: boolean; appProperties?: Record<string, string> }>(token, `/files/${id}?fields=trashed,appProperties`);
+  if (!meta.trashed || meta.appProperties?.noenotes !== "node") {
+    throw new NotAllowedError("Only notes in the trash can be deleted for good");
+  }
+  await send(token, `${API}/files/${id}`, { method: "DELETE" });
+}
+
+/** Permanently removes everything in the trash. Returns how many items were removed. */
+export async function emptyTrash(token: string): Promise<number> {
+  const all = await listTrashed(token);
+  let removed = 0;
+  for (let i = 0; i < all.length; i += 5) {
+    const results = await Promise.allSettled(all.slice(i, i + 5).map((t) => deleteForever(token, t.id)));
+    removed += results.filter((r) => r.status === "fulfilled").length;
+  }
+  return removed;
 }

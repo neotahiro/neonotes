@@ -31,6 +31,11 @@ export interface SyncInfo {
   parentId: string | null;
   /** Drive's modifiedTime after our last write or read. */
   modified: string;
+  /**
+   * The id this note was first created with, on whichever device made it. It is the same on every device,
+   * so links between notes keep working. Missing when it equals the node's own id.
+   */
+  localId?: string;
 }
 
 /** A file or folder as listed by Drive. parentId is a Drive id, or null for the top level. */
@@ -44,6 +49,17 @@ export interface RemoteNode {
   modified: string;
   /** Id of the device that last wrote this file. */
   writer?: string;
+  /** The id the note was first created with (see SyncInfo.localId). */
+  localId?: string;
+}
+
+/** A note or folder sitting in the trash. */
+export interface TrashItem {
+  id: string;
+  kind: NodeKind;
+  name: string;
+  /** When it was moved to the trash, in milliseconds. */
+  trashedAt: number;
 }
 
 export interface CreateBody {

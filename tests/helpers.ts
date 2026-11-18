@@ -15,6 +15,12 @@ export class FakeDrive {
     this.clock += 1000;
     return new Date(this.clock).toISOString();
   }
+  /** Brings a note back from the trash, as the Drive trash does. */
+  restore(driveId: string) {
+    const f = this.files.get(driveId)!;
+    f.trashed = false;
+    f.n.modified = this.tick();
+  }
   live() {
     return [...this.files.values()].filter((f) => !f.trashed);
   }
@@ -57,7 +63,7 @@ export class FakeDrive {
   }
 
   api: RemoteApi = {
-    list: async () => this.live().map((f) => ({ ...f.n })),
+    list: async () => this.live().map((f) => ({ ...f.n, localId: f.localId })),
     content: async (id) => this.files.get(id)!.content,
     get: async (id) => {
       const f = this.files.get(id);

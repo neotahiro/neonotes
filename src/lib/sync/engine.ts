@@ -104,7 +104,10 @@ export async function pushToDrive(env: SyncEnv): Promise<void> {
   const dirty = snapshot.filter(isDirty).sort((a, b) => depth(a) - depth(b) || a.createdAt - b.createdAt);
 
   const markSynced = (n: WorkspaceNode, driveId: string, modified: string) => {
-    const sync: SyncInfo = { driveId, version: n.updatedAt, parentId: n.parentId, modified };
+    const sync: SyncInfo = {
+      driveId, version: n.updatedAt, parentId: n.parentId, modified,
+      ...(n.sync?.localId ? { localId: n.sync.localId } : {}),
+    };
     if (env.nodes().some((x) => x.id === n.id)) {
       env.mutate((prev) => prev.map((x) => (x.id === n.id ? { ...x, sync } : x)));
     } else {

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { FilePlus, FolderPlus, Search, Star } from "lucide-react";
+import { FilePlus, FolderPlus, Search, Star, Trash2 } from "lucide-react";
 import type { Workspace } from "@/hooks/useWorkspace";
 import type { UserInfo, WorkspaceNode } from "@/lib/types";
 import { cn, stripHtml } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { IconButton } from "@/components/ui/IconButton";
 import { Logo } from "@/components/ui/Logo";
 import { MoveDialog } from "@/components/ui/MoveDialog";
+import { TrashDialog } from "@/components/ui/TrashDialog";
 import { ProfileMenu } from "./ProfileMenu";
 
 interface SidebarProps {
@@ -29,6 +30,7 @@ export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps
   const [moving, setMoving] = useState<WorkspaceNode | null>(null);
   const [targetId, setTargetId] = useState<string | null>(null); // folder that new items are created in
   const [rootOver, setRootOver] = useState(false);
+  const [trashOpen, setTrashOpen] = useState(false);
 
   // After loading, open the folders that contain the current document.
   useEffect(() => {
@@ -233,16 +235,28 @@ export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps
           )}
         </nav>
 
+        <div className="px-2 pb-1">
+          <button
+            type="button"
+            onClick={() => setTrashOpen(true)}
+            className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-sm text-muted transition-colors hover:bg-hover hover:text-ink"
+          >
+            <Trash2 className="h-4 w-4" strokeWidth={1.75} />
+            Trash
+          </button>
+        </div>
+
         <ProfileMenu user={user} />
       </aside>
 
       <ConfirmDialog
         open={pendingDelete !== null}
-        title={pendingDelete?.kind === "folder" ? "Delete this folder?" : "Delete this document?"}
+        title={pendingDelete?.kind === "folder" ? "Move this folder to the trash?" : "Move this document to the trash?"}
+        confirmLabel="Move to trash"
         message={
           pendingDelete?.kind === "folder"
-            ? `“${pendingDelete.name || "Untitled"}” and everything inside it will be deleted.`
-            : `“${pendingDelete?.name || "Untitled"}” will be deleted.`
+            ? `“${pendingDelete.name || "Untitled"}” and everything inside it will go to the trash. You can restore it from there.`
+            : `“${pendingDelete?.name || "Untitled"}” will go to the trash. You can restore it from there.`
         }
         onConfirm={() => {
           if (pendingDelete) ws.remove(pendingDelete.id);
@@ -250,6 +264,8 @@ export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps
         }}
         onCancel={() => setPendingDelete(null)}
       />
+
+      <TrashDialog open={trashOpen} onClose={() => setTrashOpen(false)} onRestored={ws.syncNow} />
 
       <MoveDialog
         node={moving}

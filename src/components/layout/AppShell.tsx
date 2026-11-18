@@ -6,6 +6,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useTimer } from "@/hooks/useTimer";
 import { splitSettings, updateSettings } from "@/lib/editor/noteSettings";
+import { canonicalId, findNoteById, noteAliases } from "@/lib/noteIds";
 import { FocusBar } from "@/components/tools/FocusBar";
 import { TimerDoneDialog } from "@/components/tools/TimerDoneDialog";
 import { Editor } from "@/components/editor/Editor";
@@ -71,7 +72,7 @@ export function AppShell({ user }: { user: UserInfo }) {
         for (let p = n.parentId ? byId.get(n.parentId) : undefined; p && folders.length < 5; p = p.parentId ? byId.get(p.parentId) : undefined) {
           folders.unshift(p.name || "Untitled");
         }
-        return { id: n.id, name: n.name || "Untitled", path: folders.join(" / ") };
+        return { id: canonicalId(n), aliases: noteAliases(n), name: n.name || "Untitled", path: folders.join(" / ") };
       });
   }, [ws.nodes]);
 
@@ -127,8 +128,11 @@ export function AppShell({ user }: { user: UserInfo }) {
             dimOthers={dimOthers}
             onWordCount={setWords}
             notes={noteRefs}
-            currentId={active.id}
-            onOpenNote={ws.select}
+            currentId={canonicalId(active)}
+            onOpenNote={(linkId) => {
+              const target = findNoteById(ws.nodes, linkId);
+              if (target) ws.select(target.id);
+            }}
           />
         ) : (
           <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
