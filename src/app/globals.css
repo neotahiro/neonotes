@@ -64,8 +64,9 @@ body { @apply bg-paper font-sans text-ink antialiased; }
 .editor-prose ul[data-type="taskList"] { list-style: none; padding-left: 0.1em; }
 .editor-prose ul[data-type="taskList"] ul[data-type="taskList"] { padding-left: 1.4em; }
 .editor-prose ul[data-type="taskList"] > li { display: flex; align-items: flex-start; gap: 0.6em; }
-.editor-prose ul[data-type="taskList"] > li > label { flex: none; margin-top: 0.4em; user-select: none; }
-.editor-prose ul[data-type="taskList"] > li > label input { width: 1em; height: 1em; accent-color: var(--accent); cursor: pointer; }
+/* The label is exactly one line tall, so the box sits level with the first line of text at any line spacing. */
+.editor-prose ul[data-type="taskList"] > li > label { flex: none; display: flex; align-items: center; height: calc(var(--lh, 1.75) * 1em); margin: 0; user-select: none; }
+.editor-prose ul[data-type="taskList"] > li > label input { width: 1em; height: 1em; margin: 0; accent-color: var(--accent); cursor: pointer; }
 .editor-prose ul[data-type="taskList"] > li > div { flex: 1; min-width: 0; }
 .editor-prose ul[data-type="taskList"] > li[data-checked="true"] > div { color: var(--muted); text-decoration: line-through; }
 
@@ -74,6 +75,16 @@ body { @apply bg-paper font-sans text-ink antialiased; }
 .editor-prose .note-link::before { content: "↗ "; font-size: 0.85em; opacity: 0.8; }
 .editor-prose .note-link[data-missing] { color: var(--muted); background: transparent; text-decoration: line-through; cursor: default; }
 .editor-prose .note-link.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+
+/* Footnotes: numbered automatically by their place in the note */
+.editor-prose { counter-reset: footnote; }
+.editor-prose .footnote-ref { counter-increment: footnote; color: var(--accent); cursor: pointer; font-size: 0.75em; line-height: 0; vertical-align: super; padding: 0 0.15em; }
+.editor-prose .footnote-ref::after { content: counter(footnote); }
+.editor-prose .footnote-ref.ProseMirror-selectednode { outline: 2px solid var(--accent); border-radius: 3px; }
+.footnote-list { font-size: calc(0.9rem * var(--zoom, 1)); line-height: 1.5; }
+
+/* Comments */
+.editor-prose [data-comment-id]:not([data-resolved]) { background: rgba(245, 158, 11, 0.25); border-bottom: 2px solid rgba(245, 158, 11, 0.8); cursor: pointer; }
 
 /* Focus mode: everything except the paragraph you are in fades back. */
 .editor-prose > * { transition: opacity 0.2s; }
