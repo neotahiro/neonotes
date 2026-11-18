@@ -32,11 +32,12 @@ body { @apply bg-paper font-sans text-ink antialiased; }
 .editor-prose {
   font-family: var(--font-serif), Georgia, serif;
   font-size: calc(1rem * var(--zoom, 1));
-  line-height: 1.75;
+  line-height: var(--lh, 1.75);
+  word-spacing: var(--ws, 0em);
   color: var(--ink);
   outline: none;
 }
-.editor-prose > * + * { margin-top: 1.1em; }
+.editor-prose > * + * { margin-top: var(--ps, 1.1em); }
 .editor-prose h1 { font-size: 1.9em; line-height: 1.25; font-weight: 600; margin-top: 1.8em; letter-spacing: -0.01em; }
 .editor-prose h2 { font-size: 1.5em; line-height: 1.3; font-weight: 600; margin-top: 1.6em; }
 .editor-prose h3 { font-size: 1.25em; line-height: 1.4; font-weight: 600; margin-top: 1.4em; }

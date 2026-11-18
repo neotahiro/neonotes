@@ -1,15 +1,17 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import {
-  Bold, Heading1, Heading2, Heading3, Italic, Link2, List, ListOrdered, Minus,
+  AlignVerticalSpaceAround, Bold, Heading1, Heading2, Heading3, Italic, Link2, List, ListOrdered, Minus,
   Pilcrow, Quote, Redo2, Strikethrough, Type, Underline, Undo2,
 } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { useModKey } from "@/hooks/useModKey";
 import { useKeyboardInset } from "@/hooks/useKeyboardInset";
 import { StylePanel } from "./StylePanel";
+import { SpacingPanel } from "./SpacingPanel";
+import type { Spacing } from "@/lib/editor/spacing";
 
 /** Returns a safe address, or null if it can't be used. Only http, https and mailto are allowed. */
 function parseUrl(raw: string): string | null {
@@ -21,11 +23,19 @@ function parseUrl(raw: string): string | null {
 
 const Divider = () => <span aria-hidden className="mx-1 h-5 w-px shrink-0 bg-line" />;
 
-export function Toolbar({ editor }: { editor: Editor }) {
+interface ToolbarProps {
+  editor: Editor;
+  spacing: Spacing;
+  onSpacingChange: (next: Spacing) => void;
+}
+
+export function Toolbar({ editor, spacing, onSpacingChange }: ToolbarProps) {
   const mod = useModKey();
   const keyboard = useKeyboardInset();
   const [linkOpen, setLinkOpen] = useState(false);
   const [styleOpen, setStyleOpen] = useState(false);
+  const [spacingOpen, setSpacingOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [linkValue, setLinkValue] = useState("");
   const [linkError, setLinkError] = useState("");
   const [hasTarget, setHasTarget] = useState(true);
@@ -57,6 +67,7 @@ export function Toolbar({ editor }: { editor: Editor }) {
     setLinkError("");
     setHasTarget(!editor.state.selection.empty || editor.isActive("link"));
     setStyleOpen(false);
+    setSpacingOpen(false);
     setLinkOpen(true);
   }, [editor]);
 
@@ -91,9 +102,33 @@ export function Toolbar({ editor }: { editor: Editor }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [editor, openLink]);
 
+  // The style and spacing panels close when you click or tap anywhere outside them, or press Escape.
+  const panelOpen = styleOpen || spacingOpen;
+  useEffect(() => {
+    if (!panelOpen) return;
+    const close = () => { setStyleOpen(false); setSpacingOpen(false); };
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [panelOpen]);
+
+  const togglePanel = (which: "style" | "spacing") => {
+    setLinkOpen(false);
+    setStyleOpen(which === "style" ? (o) => !o : false);
+    setSpacingOpen(which === "spacing" ? (o) => !o : false);
+  };
+
   return (
     // Floats at the bottom of the writing space. On a phone it is full width and sits above the keyboard.
     <div
+      ref={rootRef}
       className="pointer-events-none absolute inset-x-0 z-10 flex flex-col items-center sm:px-4 sm:pb-4"
       style={{ bottom: Math.max(0, keyboard - 32) }}
     >
@@ -103,6 +138,14 @@ export function Toolbar({ editor }: { editor: Editor }) {
           className="pointer-events-auto max-h-[45vh] w-full overflow-y-auto border-t border-line bg-sidebar px-3 py-3 sm:mb-2 sm:w-[26rem] sm:max-w-full sm:rounded-xl sm:border sm:shadow-lg"
         >
           <StylePanel editor={editor} />
+        </div>
+      )}
+      {spacingOpen && (
+        <div
+          onMouseDown={(e) => e.preventDefault()}
+          className="pointer-events-auto max-h-[45vh] w-full overflow-y-auto border-t border-line bg-sidebar px-3 py-3 sm:mb-2 sm:w-[26rem] sm:max-w-full sm:rounded-xl sm:border sm:shadow-lg"
+        >
+          <SpacingPanel spacing={spacing} onChange={onSpacingChange} />
         </div>
       )}
       {linkOpen && (
@@ -159,24 +202,19 @@ export function Toolbar({ editor }: { editor: Editor }) {
         <IconButton icon={Heading2} label="Heading 2" shortcut={`${mod}+Alt+2`} active={s.h2} onClick={() => chain().toggleHeading({ level: 2 }).run()} />
         <IconButton icon={Heading3} label="Heading 3" shortcut={`${mod}+Alt+3`} active={s.h3} onClick={() => chain().toggleHeading({ level: 3 }).run()} />
         <Divider />
+        <IconButton icon={Type} label="Text style" active={styleOpen} onClick={() => togglePanel("style")} />
         <IconButton icon={Bold} label="Bold" shortcut={`${mod}+B`} active={s.bold} onClick={() => chain().toggleBold().run()} />
         <IconButton icon={Italic} label="Italic" shortcut={`${mod}+I`} active={s.italic} onClick={() => chain().toggleItalic().run()} />
         <IconButton icon={Underline} label="Underline" shortcut={`${mod}+U`} active={s.underline} onClick={() => chain().toggleUnderline().run()} />
         <IconButton icon={Strikethrough} label="Strikethrough" shortcut={`${mod}+Shift+S`} active={s.strike} onClick={() => chain().toggleStrike().run()} />
         <Divider />
+        <IconButton icon={AlignVerticalSpaceAround} label="Spacing" active={spacingOpen} onClick={() => togglePanel("spacing")} />
         <IconButton icon={List} label="Bullet list" shortcut={`${mod}+Shift+8`} active={s.bullet} onClick={() => chain().toggleBulletList().run()} />
         <IconButton icon={ListOrdered} label="Numbered list" shortcut={`${mod}+Shift+7`} active={s.ordered} onClick={() => chain().toggleOrderedList().run()} />
         <IconButton icon={Quote} label="Blockquote" shortcut={`${mod}+Shift+B`} active={s.quote} onClick={() => chain().toggleBlockquote().run()} />
         <IconButton icon={Link2} label="Link" shortcut={`${mod}+K`} active={s.link || linkOpen} onClick={openLink} />
         <Divider />
         <IconButton icon={Minus} label="Divider" shortcut="---" onClick={() => chain().setHorizontalRule().run()} />
-        <Divider />
-        <IconButton
-          icon={Type}
-          label="Text style"
-          active={styleOpen}
-          onClick={() => { setLinkOpen(false); setStyleOpen((o) => !o); }}
-        />
       </div>
     </div>
   );

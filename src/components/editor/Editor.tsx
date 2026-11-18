@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Underline from "@tiptap/extension-underline";
@@ -14,6 +14,7 @@ import TextAlign from "@tiptap/extension-text-align";
 import { FontSize } from "@/lib/editor/fontSizeExtension";
 import { Toolbar } from "./Toolbar";
 import { countWords } from "@/lib/editor/wordCount";
+import { joinSpacing, splitSpacing, type Spacing } from "@/lib/editor/spacing";
 import { useViewSettings, WIDTHS, ZOOMS, type PageWidth, type Zoom } from "@/hooks/useViewSettings";
 import { cn } from "@/lib/utils";
 
@@ -38,9 +39,14 @@ interface EditorProps {
 }
 
 export function Editor({ focusSignal, title, content, onTitleChange, onContentChange }: EditorProps) {
+  // The note's spacing is saved at the start of its text; split it off before the editor sees the text.
+  const [initial] = useState(() => splitSpacing(content));
+  const [spacing, setSpacing] = useState<Spacing>(initial.spacing);
+  const spacingRef = useRef(spacing);
+
   const editor = useEditor({
     immediatelyRender: false,
-    content,
+    content: initial.html,
     extensions: [
       StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
       Underline,
@@ -59,8 +65,14 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
     editorProps: { attributes: { class: "editor-prose", "aria-label": "Document body" } },
-    onUpdate: ({ editor: e }) => onContentChange(e.getHTML()),
+    onUpdate: ({ editor: e }) => onContentChange(joinSpacing(e.getHTML(), spacingRef.current)),
   });
+
+  const changeSpacing = (next: Spacing) => {
+    spacingRef.current = next;
+    setSpacing(next);
+    if (editor) onContentChange(joinSpacing(editor.getHTML(), next));
+  };
 
   const handledSignal = useRef(focusSignal);
   useEffect(() => {
@@ -88,7 +100,12 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
   return (
     <main className="flex min-h-0 flex-1 flex-col">
       <div className="relative min-h-0 flex-1">
-        <div className="h-full overflow-y-auto" style={{ "--zoom": view.zoom / 100 } as CSSProperties}>
+        <div className="h-full overflow-y-auto" style={{
+            "--zoom": view.zoom / 100,
+            "--lh": spacing.lineHeight,
+            "--ps": `${spacing.paragraph}em`,
+            "--ws": `${spacing.word}em`,
+          } as CSSProperties}>
           <div className={cn("mx-auto w-full px-5 pb-32 pt-10 sm:px-8 sm:pt-14", WIDTH_CLASS[view.width])}>
             <input
               value={title}
@@ -103,7 +120,7 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
             <EditorContent editor={editor} />
           </div>
         </div>
-        {editor && <Toolbar editor={editor} />}
+        {editor && <Toolbar editor={editor} spacing={spacing} onSpacingChange={changeSpacing} />}
       </div>
       <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-line px-4 text-xs text-muted">
         <div className="flex items-center gap-3">
