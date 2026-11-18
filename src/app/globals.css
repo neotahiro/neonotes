@@ -51,6 +51,8 @@ body { @apply bg-paper font-sans text-ink antialiased; }
   float: left; height: 0; pointer-events: none; color: var(--muted); opacity: 0.7;
 }
 
+/* Text on a highlight stays dark so it is readable in both themes. */
+.editor-prose mark { color: #1d2530 !important; border-radius: 2px; padding: 0.05em 0.1em; }
 .editor-prose hr { border: 0; height: 1px; width: 40%; margin: 2.2em auto; background: var(--muted); opacity: 0.55; cursor: pointer; }
 .editor-prose hr.ProseMirror-selectednode { background: var(--accent); opacity: 1; }
 .note-title { font-size: calc(2rem * var(--zoom, 1)); line-height: 1.25; }

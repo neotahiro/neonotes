@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
-import { Figtree, Literata } from "next/font/google";
+import { fontClassNames } from "./fonts";
 import "./globals.css";
 
-const sans = Figtree({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const serif = Literata({ subsets: ["latin"], variable: "--font-serif", display: "swap" });
 
 export const metadata: Metadata = {
   title: "NeoNotes",
@@ -18,7 +16,7 @@ const themeScript = `try{var t=localStorage.getItem('noenotes-theme');var d=t?t=
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning className={`${sans.variable} ${serif.variable}`}>
+    <html lang="en" suppressHydrationWarning className={fontClassNames}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

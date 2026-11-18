@@ -6,6 +6,12 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
+import TextStyle from "@tiptap/extension-text-style";
+import FontFamily from "@tiptap/extension-font-family";
+import Color from "@tiptap/extension-color";
+import Highlight from "@tiptap/extension-highlight";
+import TextAlign from "@tiptap/extension-text-align";
+import { FontSize } from "@/lib/editor/fontSizeExtension";
 import { Toolbar } from "./Toolbar";
 import { countWords } from "@/lib/editor/wordCount";
 import { useViewSettings, WIDTHS, ZOOMS, type PageWidth, type Zoom } from "@/hooks/useViewSettings";
@@ -45,6 +51,12 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
       }),
       Placeholder.configure({ placeholder: "Start writing…" }),
       CharacterCount,
+      TextStyle,
+      FontFamily,
+      FontSize,
+      Color,
+      Highlight.configure({ multicolor: true }),
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
     editorProps: { attributes: { class: "editor-prose", "aria-label": "Document body" } },
     onUpdate: ({ editor: e }) => onContentChange(e.getHTML()),
