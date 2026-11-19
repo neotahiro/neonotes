@@ -5,6 +5,7 @@ import type { UserInfo } from "@/lib/types";
 import { useTheme } from "@/hooks/useTheme";
 import { useWorkspace } from "@/hooks/useWorkspace";
 import { useTimer } from "@/hooks/useTimer";
+import { useTagIndex } from "@/hooks/useTagIndex";
 import { splitSettings, updateSettings } from "@/lib/editor/noteSettings";
 import { canonicalId, findNoteById, noteAliases } from "@/lib/noteIds";
 import { FocusBar } from "@/components/tools/FocusBar";
@@ -25,6 +26,7 @@ export function AppShell({ user }: { user: UserInfo }) {
   const [focus, setFocus] = useState(false);
   const [dimOthers, setDimOthers] = useState(false);
   const [words, setWords] = useState(0);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const timer = useTimer();
 
   useEffect(() => {
@@ -76,6 +78,16 @@ export function AppShell({ user }: { user: UserInfo }) {
       });
   }, [ws.nodes]);
 
+  const tagIndex = useTagIndex(ws.nodes);
+  const activeTags = active ? (tagIndex.byNote.get(active.id) ?? []) : [];
+  const changeTags = (next: string[]) => {
+    if (active) ws.setContent(active.id, updateSettings(active.content, { tags: next }));
+  };
+  const showTag = (tag: string) => {
+    setTagFilter(tag);
+    setSidebarOpen(true);
+  };
+
   const goal = active ? splitSettings(active.content).settings.goal : null;
   const changeGoal = (next: number | null) => {
     if (active) ws.setContent(active.id, updateSettings(active.content, { goal: next }));
@@ -88,7 +100,16 @@ export function AppShell({ user }: { user: UserInfo }) {
 
   return (
     <div className="flex h-dvh overflow-hidden">
-      <Sidebar open={sidebarOpen && !focus} onClose={() => setSidebarOpen(false)} ws={ws} user={user} onFocusEditor={() => setFocusSignal((n) => n + 1)} />
+      <Sidebar
+        open={sidebarOpen && !focus}
+        onClose={() => setSidebarOpen(false)}
+        ws={ws}
+        user={user}
+        onFocusEditor={() => setFocusSignal((n) => n + 1)}
+        tagIndex={tagIndex}
+        tagFilter={tagFilter}
+        onTagFilter={setTagFilter}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         {!focus && (
           <TopBar
@@ -109,6 +130,9 @@ export function AppShell({ user }: { user: UserInfo }) {
                 onDimChange={changeDim}
                 onStartFocus={() => setFocus(true)}
                 timer={timer}
+                tags={activeTags}
+                allTags={tagIndex.all}
+                onTagsChange={changeTags}
               />
             }
           />
@@ -127,6 +151,7 @@ export function AppShell({ user }: { user: UserInfo }) {
             focusMode={focus}
             dimOthers={dimOthers}
             onWordCount={setWords}
+            onTagClick={showTag}
             notes={noteRefs}
             currentId={canonicalId(active)}
             onOpenNote={(linkId) => {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEFAULT_SETTINGS, joinSettings, splitSettings, updateSettings } from "../src/lib/editor/noteSettings";
+import { DEFAULT_SETTINGS, cleanTag, joinSettings, normalizeTags, splitSettings, tagsOf, updateSettings } from "../src/lib/editor/noteSettings";
 import { DEFAULT_SPACING } from "../src/lib/editor/spacing";
 import { stripHtml } from "../src/lib/utils";
 
@@ -11,7 +11,7 @@ test("a note without a marker has the default settings and unchanged text", () =
 });
 
 test("spacing and goal survive saving and loading", () => {
-  const settings = { spacing: { lineHeight: 2, paragraph: 1.5, word: 0.1 }, goal: 1500 };
+  const settings = { spacing: { lineHeight: 2, paragraph: 1.5, word: 0.1 }, goal: 1500, tags: ["story", "draft 2"] };
   const out = splitSettings(joinSettings("<p>Hello</p>", settings));
   assert.equal(out.html, "<p>Hello</p>");
   assert.deepEqual(out.settings, settings);
@@ -22,7 +22,7 @@ test("default settings add nothing to the note", () => {
 });
 
 test("a goal alone is saved even with default spacing", () => {
-  const stored = joinSettings("<p>Hi</p>", { spacing: DEFAULT_SPACING, goal: 500 });
+  const stored = joinSettings("<p>Hi</p>", { spacing: DEFAULT_SPACING, goal: 500, tags: [] });
   assert.deepEqual(splitSettings(stored).settings.goal, 500);
 });
 
@@ -51,5 +51,47 @@ test("updating one setting keeps the others and the text", () => {
 });
 
 test("the marker is invisible to search", () => {
-  assert.equal(stripHtml(joinSettings("<p>Hello</p>", { spacing: DEFAULT_SPACING, goal: 100 })), "Hello");
+  assert.equal(stripHtml(joinSettings("<p>Hello</p>", { spacing: DEFAULT_SPACING, goal: 100, tags: [] })), "Hello");
+});
+
+test("tags alone are saved, and read without touching the text", () => {
+  const stored = joinSettings("<p>Hi</p>", { spacing: DEFAULT_SPACING, goal: null, tags: ["Novel", "ideas"] });
+  assert.deepEqual(tagsOf(stored), ["Novel", "ideas"]);
+  assert.equal(splitSettings(stored).html, "<p>Hi</p>");
+  assert.deepEqual(tagsOf("<p>no marker</p>"), []);
+});
+
+test("tags are tidied: symbols are dropped, spaces collapsed, length capped", () => {
+  assert.equal(cleanTag("  #My   Tag!! "), "My Tag");
+  assert.equal(cleanTag("a--b"), "a-b");
+  assert.equal(cleanTag("x".repeat(80)).length, 30);
+  assert.equal(cleanTag("<script>"), "script");
+  assert.equal(cleanTag("★★★"), "");
+  assert.equal(cleanTag("Café_ideas.v2"), "Café_ideas.v2");
+  assert.equal(cleanTag("日本語 ノート"), "日本語 ノート");
+});
+
+test("a tag can never break out of the hidden marker", () => {
+  const nasty = ["a-->b", "x}y", '"quoted"', "back\\slash", "--> <p>injected</p>", "</p>"];
+  const stored = joinSettings("<p>Body</p>", { spacing: DEFAULT_SPACING, goal: null, tags: nasty });
+  const out = splitSettings(stored);
+  assert.equal(out.html, "<p>Body</p>");
+  assert.ok(!stored.slice(0, stored.indexOf("<p>Body")).includes("<p>"));
+  assert.equal(stored.indexOf("-->"), stored.indexOf("<p>Body") - 3);
+  for (const t of out.settings.tags) assert.match(t, /^[\p{L}\p{N} _.-]+$/u);
+});
+
+test("tags that differ only by capital letters count once; the first spelling wins", () => {
+  assert.deepEqual(normalizeTags(["Story", "story", "STORY", "Plot"]), ["Story", "Plot"]);
+});
+
+test("empty, non-text and surplus tags are dropped", () => {
+  assert.deepEqual(normalizeTags(["", "  ", 5, null, "ok"]), ["ok"]);
+  assert.deepEqual(normalizeTags("nope"), []);
+  assert.equal(normalizeTags(Array.from({ length: 30 }, (_, i) => `t${i}`)).length, 12);
+});
+
+test("damaged tag data falls back to no tags", () => {
+  assert.deepEqual(splitSettings('<!--neonotes:{"tags":"oops"}--><p>a</p>').settings.tags, []);
+  assert.deepEqual(splitSettings('<!--neonotes:{"tags":[1,{"a":1}]}--><p>a</p>').settings.tags, []);
 });

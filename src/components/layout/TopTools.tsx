@@ -1,15 +1,17 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Focus, Target, Timer } from "lucide-react";
+import { Focus, Tag, Target, Timer } from "lucide-react";
 import { IconButton } from "@/components/ui/IconButton";
 import { FocusPanel } from "@/components/tools/FocusPanel";
 import { GoalPanel } from "@/components/tools/GoalPanel";
+import { TagsPanel } from "@/components/tools/TagsPanel";
 import { TimerPanel } from "@/components/tools/TimerPanel";
+import type { TagCount } from "@/lib/tags";
 import type { TimerApi } from "@/hooks/useTimer";
 import { formatClock } from "@/lib/timer";
 import { cn } from "@/lib/utils";
 
-type Tool = "goal" | "focus" | "timer";
+type Tool = "goal" | "tags" | "focus" | "timer";
 
 interface TopToolsProps {
   hasNote: boolean;
@@ -20,10 +22,13 @@ interface TopToolsProps {
   onDimChange: (dim: boolean) => void;
   onStartFocus: () => void;
   timer: TimerApi;
+  tags: string[];
+  allTags: TagCount[];
+  onTagsChange: (tags: string[]) => void;
 }
 
 /** The goal, focus and timer buttons in the top bar. Each opens a small panel underneath. */
-export function TopTools({ hasNote, goal, words, onGoalChange, dim, onDimChange, onStartFocus, timer }: TopToolsProps) {
+export function TopTools({ hasNote, goal, words, onGoalChange, dim, onDimChange, onStartFocus, timer, tags, allTags, onTagsChange }: TopToolsProps) {
   const [open, setOpen] = useState<Tool | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -47,6 +52,7 @@ export function TopTools({ hasNote, goal, words, onGoalChange, dim, onDimChange,
 
   return (
     <div ref={rootRef} className="flex items-center">
+      <IconButton icon={Tag} label="Tags" active={open === "tags"} onClick={() => toggle("tags")} />
       <IconButton icon={Target} label="Writing goal" active={open === "goal"} onClick={() => toggle("goal")} />
       <IconButton icon={Focus} label="Focus mode" active={open === "focus"} onClick={() => toggle("focus")} />
       <div className="flex items-center">
@@ -65,6 +71,7 @@ export function TopTools({ hasNote, goal, words, onGoalChange, dim, onDimChange,
 
       {open && (
         <div className="absolute right-3 top-full z-30 mt-1 w-[min(22rem,calc(100vw-1.5rem))] rounded-xl border border-line bg-paper p-4 shadow-lg">
+          {open === "tags" && <TagsPanel hasNote={hasNote} tags={tags} allTags={allTags} onChange={onTagsChange} />}
           {open === "goal" && <GoalPanel hasNote={hasNote} goal={goal} words={words} onChange={onGoalChange} />}
           {open === "focus" && (
             <FocusPanel

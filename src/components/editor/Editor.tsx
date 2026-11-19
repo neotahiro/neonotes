@@ -25,6 +25,7 @@ import { Comment } from "@/lib/editor/commentExtension";
 import { NoteLinkSuggestion, type NoteLinkSuggestState } from "@/lib/editor/noteLinkSuggestion";
 import { syncNoteLinkLabels, type NoteRef } from "@/lib/editor/noteLinks";
 import { NoteLinkMenu } from "./NoteLinkMenu";
+import { TagChips } from "./TagChips";
 import { NoteLinkPicker } from "./NoteLinkPicker";
 import { FootnotePanel } from "./FootnotePanel";
 import { FootnoteList } from "./FootnoteList";
@@ -69,14 +70,17 @@ interface EditorProps {
   currentId?: string;
   /** Called when a link to another note is clicked. */
   onOpenNote?: (id: string) => void;
+  /** Called when a tag under the title is clicked. */
+  onTagClick?: (tag: string) => void;
 }
 
-export function Editor({ focusSignal, title, content, onTitleChange, onContentChange, focusMode = false, dimOthers = false, onWordCount, notes = [], currentId, onOpenNote }: EditorProps) {
+export function Editor({ focusSignal, title, content, onTitleChange, onContentChange, focusMode = false, dimOthers = false, onWordCount, notes = [], currentId, onOpenNote, onTagClick }: EditorProps) {
   // The note's settings (spacing, word goal) are saved at the start of its text; split them off before the editor sees the text.
   const [initial] = useState(() => splitSettings(content));
-  const { spacing, goal } = splitSettings(content).settings;
-  const settingsRef = useRef({ spacing, goal });
-  settingsRef.current = { spacing, goal };
+  const settings = splitSettings(content).settings;
+  const { spacing, goal, tags } = settings;
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
 
   // Links between notes: the "[[" menu, the toolbar panel, and keeping link titles current.
   const notesRef = useRef(notes);
@@ -228,6 +232,7 @@ export function Editor({ focusSignal, title, content, onTitleChange, onContentCh
               aria-label="Document title"
               className="note-title mb-6 w-full bg-transparent font-serif font-semibold tracking-tight outline-none placeholder:text-muted"
             />
+            {!focusMode && <TagChips tags={tags} onTagClick={onTagClick} />}
             <EditorContent editor={editor} />
             {editor && (
               <FootnoteList

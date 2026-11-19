@@ -4,6 +4,10 @@ import { FilePlus, FolderPlus, Search, Star, Trash2 } from "lucide-react";
 import type { Workspace } from "@/hooks/useWorkspace";
 import type { UserInfo, WorkspaceNode } from "@/lib/types";
 import { cn, stripHtml } from "@/lib/utils";
+import type { TagIndex } from "@/hooks/useTagIndex";
+import { tagKey } from "@/lib/editor/noteSettings";
+import { byDisplayOrder } from "@/lib/tree";
+import { TagList } from "./TagList";
 import { FileTree } from "@/components/navigation/FileTree";
 import { DRAG_TYPE, TreeRow, type TreeActions } from "@/components/navigation/TreeRow";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -20,9 +24,14 @@ interface SidebarProps {
   onFocusEditor: () => void;
   ws: Workspace;
   user: UserInfo;
+  /** The tags of every note. */
+  tagIndex: TagIndex;
+  /** Show only notes with this tag, or null for everything. */
+  tagFilter: string | null;
+  onTagFilter: (tag: string | null) => void;
 }
 
-export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps) {
+export function Sidebar({ open, onClose, onFocusEditor, ws, user, tagIndex, tagFilter, onTagFilter }: SidebarProps) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -100,15 +109,24 @@ export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps
   };
 
   const q = query.trim().toLowerCase();
-  const results = useMemo(
-    () =>
-      q
-        ? ws.nodes.filter(
-            (n) => n.kind === "doc" && (n.name.toLowerCase().includes(q) || stripHtml(n.content).toLowerCase().includes(q)),
-          )
-        : [],
-    [q, ws.nodes],
-  );
+  const wantedTag = tagFilter ? tagKey(tagFilter) : null;
+  const filtering = Boolean(q || wantedTag);
+  const results = useMemo(() => {
+    if (!filtering) return [];
+    return ws.nodes
+      .filter((n) => {
+        if (n.kind !== "doc") return false;
+        const tags = tagIndex.byNote.get(n.id) ?? [];
+        if (wantedTag && !tags.some((t) => tagKey(t) === wantedTag)) return false;
+        if (!q) return true;
+        return (
+          n.name.toLowerCase().includes(q) ||
+          tags.some((t) => t.toLowerCase().includes(q)) ||
+          stripHtml(n.content).toLowerCase().includes(q)
+        );
+      })
+      .sort(byDisplayOrder);
+  }, [filtering, q, wantedTag, ws.nodes, tagIndex]);
   const favorites = ws.nodes.filter((n) => n.kind === "doc" && n.favorite);
   const folderName = (n: WorkspaceNode) => ws.nodes.find((p) => p.id === n.parentId)?.name;
 
@@ -177,14 +195,30 @@ export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps
         </div>
 
         <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {q ? (
-            results.length ? (
-              results.map((n) => flatRow(n, folderName(n)))
-            ) : (
-              <p className="px-2 py-3 text-sm text-muted">No documents match “{query}”.</p>
-            )
+          {filtering ? (
+            <>
+              {!q && <TagList tags={tagIndex.all} active={tagFilter} onPick={onTagFilter} />}
+              {tagFilter && (
+                <div className="mb-1 flex items-center justify-between gap-2 px-2 py-1 text-xs">
+                  <span className="truncate text-muted">
+                    Notes tagged <span className="text-accent">#{tagFilter}</span>
+                  </span>
+                  <button type="button" onClick={() => onTagFilter(null)} className="shrink-0 text-muted underline-offset-2 hover:text-ink hover:underline">
+                    Clear
+                  </button>
+                </div>
+              )}
+              {results.length ? (
+                results.map((n) => flatRow(n, folderName(n)))
+              ) : (
+                <p className="px-2 py-3 text-sm text-muted">
+                  {q ? `No documents match “${query}”.` : "No notes have this tag."}
+                </p>
+              )}
+            </>
           ) : (
             <>
+              <TagList tags={tagIndex.all} active={tagFilter} onPick={onTagFilter} />
               {favorites.length > 0 && (
                 <section className="mb-3">
                   <h2 className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-muted">
