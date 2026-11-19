@@ -1,5 +1,5 @@
 "use client";
-import { byCreated } from "@/lib/tree";
+import { byDisplayOrder } from "@/lib/tree";
 import type { WorkspaceNode } from "@/lib/types";
 import { TreeRow, type TreeActions } from "./TreeRow";
 
@@ -13,7 +13,7 @@ interface FileTreeProps extends TreeActions {
 }
 
 export function FileTree({ nodes, parentId, depth = 0, ...rest }: FileTreeProps) {
-  const children = nodes.filter((n) => n.parentId === parentId).sort(byCreated);
+  const children = nodes.filter((n) => n.parentId === parentId).sort(byDisplayOrder);
 
   if (children.length === 0 && parentId !== null) {
     return (

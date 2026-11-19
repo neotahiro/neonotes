@@ -38,7 +38,7 @@ export class FakeDrive {
     }
     const id = "D" + ++this.seq;
     const n: RemoteNode = {
-      id, kind: b.kind, name: b.name, parentId: b.parentDriveId, favorite: b.favorite,
+      id, kind: b.kind, name: b.name, parentId: b.parentDriveId, favorite: b.favorite, pinned: b.pinned,
       createdAt: b.createdAt, modified: this.tick(), writer: b.writer,
     };
     this.files.set(id, { localId: b.localId, content: b.content, n });
@@ -55,6 +55,7 @@ export class FakeDrive {
     if (b.trashed) f.trashed = true;
     if (b.name !== undefined) f.n.name = b.name;
     if (b.favorite !== undefined) f.n.favorite = b.favorite;
+    if (b.pinned !== undefined) f.n.pinned = b.pinned;
     if (b.parentDriveId !== undefined) f.n.parentId = b.parentDriveId;
     if (b.content !== undefined) f.content = b.content;
     if (b.writer) f.n.writer = b.writer;

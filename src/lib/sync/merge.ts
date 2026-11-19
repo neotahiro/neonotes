@@ -89,6 +89,7 @@ export function planPull(
         name: r.name,
         parentId: parentLocal,
         favorite: r.favorite,
+        pinned: r.pinned ?? false,
         content: existing?.content ?? "",
         createdAt: r.createdAt,
         updatedAt: version,

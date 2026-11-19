@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import type { DragEvent } from "react";
-import { ChevronRight, FileText, FilePlus, Folder, FolderInput, FolderOpen, Pencil, Star, Trash2 } from "lucide-react";
+import { ChevronRight, FileText, FilePlus, Folder, FolderInput, FolderOpen, Pencil, Pin, Star, Trash2 } from "lucide-react";
 import type { WorkspaceNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { IconButton } from "@/components/ui/IconButton";
@@ -17,6 +17,7 @@ export interface TreeActions {
   onCancelRename: () => void;
   onDelete: (node: WorkspaceNode) => void;
   onFavorite: (id: string) => void;
+  onPin: (id: string) => void;
   onAddDoc: (parentId: string) => void;
   onMove: (node: WorkspaceNode) => void;
   onDropOn: (draggedId: string, targetFolderId: string) => void;
@@ -114,8 +115,13 @@ export function TreeRow(p: TreeRowProps) {
         </button>
       )}
 
+      {node.pinned && !editing && (
+        <Pin aria-label="Pinned" className="h-3 w-3 shrink-0 text-muted group-hover:hidden group-focus-within:hidden [@media(hover:none)]:hidden" strokeWidth={1.75} />
+      )}
+
       {!editing && (
         <div className={reveal}>
+          <IconButton size="sm" icon={Pin} label={node.pinned ? "Unpin" : "Pin to top"} active={Boolean(node.pinned)} onClick={() => p.onPin(node.id)} />
           {isFolder ? (
             <IconButton size="sm" icon={FilePlus} label="New document in folder" onClick={() => p.onAddDoc(node.id)} />
           ) : (

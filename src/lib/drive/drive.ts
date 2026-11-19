@@ -115,6 +115,7 @@ export async function listNodes(token: string, rootId: string): Promise<RemoteNo
         name: f.name,
         parentId: !parent || parent === rootId ? null : parent,
         favorite: f.appProperties?.favorite === "true",
+        pinned: f.appProperties?.pinned === "true",
         createdAt: Number(f.appProperties?.createdAt) || Date.parse(f.modifiedTime),
         modified: f.modifiedTime,
         writer: f.appProperties?.writer,
@@ -168,6 +169,7 @@ export async function updateNode(token: string, rootId: string, id: string, patc
   if (patch.name !== undefined) metadata.name = patch.name;
   const props: Record<string, string> = {};
   if (patch.favorite !== undefined) props.favorite = String(patch.favorite);
+  if (patch.pinned !== undefined) props.pinned = String(patch.pinned);
   if (patch.writer) props.writer = patch.writer;
   if (Object.keys(props).length) metadata.appProperties = props;
   if (patch.trashed) metadata.trashed = true; // goes to the Drive trash, so it's recoverable
@@ -193,6 +195,7 @@ export async function createNode(token: string, rootId: string, input: CreateBod
     return updateNode(token, rootId, dup.files[0].id, {
       name: input.name,
       favorite: input.favorite,
+      pinned: input.pinned,
       parentDriveId: input.parentDriveId,
       content: input.kind === "doc" ? input.content : undefined,
       writer: input.writer,
@@ -207,6 +210,7 @@ export async function createNode(token: string, rootId: string, input: CreateBod
       noenotes: "node",
       localId: input.localId,
       favorite: String(input.favorite),
+      pinned: String(Boolean(input.pinned)),
       createdAt: String(input.createdAt),
       ...(input.writer ? { writer: input.writer } : {}),
     },

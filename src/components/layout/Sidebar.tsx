@@ -89,6 +89,7 @@ export function Sidebar({ open, onClose, onFocusEditor, ws, user }: SidebarProps
     onCancelRename: () => setEditingId(null),
     onDelete: setPendingDelete,
     onFavorite: ws.toggleFavorite,
+    onPin: ws.togglePin,
     onAddDoc: (parentId) => {
       expand(parentId);
       setTargetId(parentId);

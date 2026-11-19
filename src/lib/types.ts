@@ -7,6 +7,8 @@ export interface WorkspaceNode {
   name: string;
   parentId: string | null;
   favorite: boolean;
+  /** Pinned items stay at the top of their folder. Missing means not pinned. */
+  pinned?: boolean;
   /** TipTap HTML. Empty for folders. */
   content: string;
   /** Present once the node has been saved to Drive. */
@@ -45,6 +47,7 @@ export interface RemoteNode {
   name: string;
   parentId: string | null;
   favorite: boolean;
+  pinned?: boolean;
   createdAt: number;
   modified: string;
   /** Id of the device that last wrote this file. */
@@ -67,6 +70,7 @@ export interface CreateBody {
   kind: NodeKind;
   name: string;
   favorite: boolean;
+  pinned?: boolean;
   createdAt: number;
   parentDriveId: string | null;
   content: string;
@@ -76,6 +80,7 @@ export interface CreateBody {
 export interface UpdateBody {
   name?: string;
   favorite?: boolean;
+  pinned?: boolean;
   /** Drive id of the new parent, or null for the top level. Omit if the parent didn't change. */
   parentDriveId?: string | null;
   content?: string;

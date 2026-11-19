@@ -58,6 +58,7 @@ export function parseCreate(b: unknown): CreateBody | null {
     (b.kind !== "doc" && b.kind !== "folder") ||
     name === null ||
     typeof b.favorite !== "boolean" ||
+    (b.pinned !== undefined && typeof b.pinned !== "boolean") ||
     typeof b.createdAt !== "number" || !Number.isFinite(b.createdAt) ||
     !parentOk(b.parentDriveId ?? null) ||
     content.length > MAX_CONTENT ||
@@ -66,7 +67,7 @@ export function parseCreate(b: unknown): CreateBody | null {
     return null;
   }
   return {
-    localId: b.localId, kind: b.kind, name, favorite: b.favorite, createdAt: b.createdAt,
+    localId: b.localId, kind: b.kind, name, favorite: b.favorite, pinned: b.pinned === true, createdAt: b.createdAt,
     parentDriveId: (b.parentDriveId ?? null) as string | null, content,
     writer: typeof b.writer === "string" ? b.writer : undefined,
   };
@@ -83,6 +84,10 @@ export function parseUpdate(b: unknown): UpdateBody | null {
   if (b.favorite !== undefined) {
     if (typeof b.favorite !== "boolean") return null;
     out.favorite = b.favorite;
+  }
+  if (b.pinned !== undefined) {
+    if (typeof b.pinned !== "boolean") return null;
+    out.pinned = b.pinned;
   }
   if (b.parentDriveId !== undefined) {
     if (!parentOk(b.parentDriveId)) return null;

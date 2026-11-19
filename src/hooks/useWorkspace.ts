@@ -221,6 +221,13 @@ export function useWorkspace() {
     [mutate],
   );
 
+  const togglePin = useCallback(
+    (id: string) => {
+      mutate((prev) => prev.map((n) => (n.id === id ? { ...n, pinned: !n.pinned, updatedAt: Date.now() } : n)));
+    },
+    [mutate],
+  );
+
   const remove = useCallback(
     (id: string) => {
       const list = nodesRef.current;
@@ -264,7 +271,7 @@ export function useWorkspace() {
 
   return {
     nodes, activeId, ready, status, revision, notice, dismissNotice: () => setNotice(null), syncNow,
-    select: setActive, create, rename, setContent, toggleFavorite, remove, move,
+    select: setActive, create, rename, setContent, toggleFavorite, togglePin, remove, move,
   };
 }
 

@@ -125,7 +125,7 @@ export async function pushToDrive(env: SyncEnv): Promise<void> {
       let current: WorkspaceNode = n;
       for (let attempt = 0; ; attempt++) {
         const body: Parameters<RemoteApi["update"]>[1] = {
-          name, favorite: n.favorite, expectedModified: current.sync!.modified, writer: env.deviceId,
+          name, favorite: n.favorite, pinned: Boolean(n.pinned), expectedModified: current.sync!.modified, writer: env.deviceId,
         };
         if (n.parentId !== n.sync.parentId) body.parentDriveId = parentDrive ?? null;
         if (n.kind === "doc") body.content = n.content;
@@ -151,7 +151,7 @@ export async function pushToDrive(env: SyncEnv): Promise<void> {
       }
     } else {
       const res = await env.api.create({
-        localId: n.id, kind: n.kind, name, favorite: n.favorite, createdAt: n.createdAt,
+        localId: n.id, kind: n.kind, name, favorite: n.favorite, pinned: Boolean(n.pinned), createdAt: n.createdAt,
         parentDriveId: parentDrive ?? null, content: n.kind === "doc" ? n.content : "",
         writer: env.deviceId,
       });

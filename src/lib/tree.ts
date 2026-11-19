@@ -4,6 +4,10 @@ import type { WorkspaceNode } from "./types";
 export const byCreated = (a: WorkspaceNode, b: WorkspaceNode) =>
   a.createdAt - b.createdAt || a.id.localeCompare(b.id);
 
+/** Pinned items first, then oldest first. This is the order the sidebar shows. */
+export const byDisplayOrder = (a: WorkspaceNode, b: WorkspaceNode) =>
+  Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)) || byCreated(a, b);
+
 /** The node's own id plus the ids of everything nested inside it. */
 export function descendantIds(nodes: WorkspaceNode[], id: string): Set<string> {
   const out = new Set([id]);
@@ -32,7 +36,7 @@ export function folderOptions(nodes: WorkspaceNode[]): FolderOption[] {
   const walk = (parentId: string | null, depth: number) => {
     nodes
       .filter((n) => n.kind === "folder" && n.parentId === parentId)
-      .sort(byCreated)
+      .sort(byDisplayOrder)
       .forEach((f) => {
         out.push({ id: f.id, name: f.name, depth });
         walk(f.id, depth + 1);
